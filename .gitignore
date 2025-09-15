@@ -3,7 +3,7 @@
 *.pot
 *.pyc
 __pycache__/
-db.sqlite3
+
 media/
 staticfiles/
 
@@ -27,7 +27,7 @@ Thumbs.db
 .dockerignore
 
 # Database
-*.sqlite3
+
 migrations/*.py
 !migrations/__init__.py
-*.sql
+
