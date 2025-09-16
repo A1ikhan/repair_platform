@@ -1,4 +1,4 @@
-# api/dependencies.py
+# endpoints/dependencies.py
 from django.http import HttpRequest
 from ninja.security import HttpBearer
 from ninja_jwt.tokens import Token

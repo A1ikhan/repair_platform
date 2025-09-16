@@ -1,9 +1,7 @@
-from django.contrib import admin
-
 # Register your models here.
 # back/admin.py
 from django.contrib import admin
-from .models import CustomerProfile, WorkerProfile, RepairRequest
+from back.models import CustomerProfile, WorkerProfile, RepairRequest
 
 @admin.register(CustomerProfile)
 class CustomerProfileAdmin(admin.ModelAdmin):
