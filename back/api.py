@@ -21,15 +21,6 @@ api.add_router("/notifications", notification.router)
 api.add_router("/workers", workers.router)
 
 # Тестовые эндпоинты
-@api.get("/protected/test")
-def test_protected(request):
-    return {"message": f"Hello {request.user.username}!"}
-
-@api.get("/public/hello", auth=None)
-def hello_public(request):
-    return {"message": "Hello from Repair Platform API!"}
-from ninja import NinjaAPI
-from back.dependencies import AuthBearer
 
 # Импортируем саброутеры
 from .api import auth, repairs, responses, reviews, notification, workers
@@ -50,11 +41,12 @@ api.add_router("/reviews", reviews.router)
 api.add_router("/notifications", notification.router)
 api.add_router("/workers", workers.router)
 
-# Тестовые эндпоинты
-@api.get("/protected/test")
+@api.get("/protected/test",tags=["test"])
 def test_protected(request):
     return {"message": f"Hello {request.user.username}!"}
 
-@api.get("/public/hello", auth=None)
+@api.get("/public/hello", auth=None,tags=["test"])
 def hello_public(request):
     return {"message": "Hello from Repair Platform API!"}
+from ninja import NinjaAPI
+from back.dependencies import AuthBearer
