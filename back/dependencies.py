@@ -1,14 +1,14 @@
 # endpoints/dependencies.py
 from django.http import HttpRequest
 from ninja.security import HttpBearer
-from ninja_jwt.tokens import Token
+from ninja_jwt.tokens import Token, AccessToken
 from django.contrib.auth.models import User
 from ninja.errors import HttpError
 
 class AuthBearer(HttpBearer):
     def authenticate(self, request: HttpRequest, token: str):
         try:
-            validated_token = Token(token)
+            validated_token = AccessToken(token)
             user_id = validated_token.payload.get('user_id')
             user = User.objects.get(id=user_id)
             request.user = user  # Добавляем пользователя в request

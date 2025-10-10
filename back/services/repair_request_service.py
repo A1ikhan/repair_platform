@@ -2,31 +2,44 @@ from ninja.errors import HttpError
 from back.models import RepairRequest
 from django.db import models
 
+from back.models.repair_requests_models import RepairRequestFile
+
 
 class RepairRequestService:
     @staticmethod
     def get_all_requests():
-        return RepairRequest.objects.select_related('created_by').all()
+        return RepairRequest.objects.select_related('created_by').prefetch_related('files').all()
 
     @staticmethod
     def get_request_by_id(request_id: int):
         try:
-            return RepairRequest.objects.select_related('created_by').get(id=request_id)
+            return RepairRequest.objects.select_related('created_by').prefetch_related('files').get(id=request_id)
         except RepairRequest.DoesNotExist:
             raise HttpError(404, "Repair request not found")
 
     @staticmethod
     def get_user_requests(user):
-        return RepairRequest.objects.filter(created_by=user).select_related('created_by')
+        return RepairRequest.objects.filter(created_by=user).select_related('created_by').prefetch_related('files')
+
 
     @staticmethod
-    def create_request(data, user):
-        return RepairRequest.objects.create(
+    def create_request(data, user,file=None, file_description=None):
+        repair_request = RepairRequest.objects.create(
             **data.dict(),
             created_by=user,
             status='new'
         )
 
+        # Если передан файл, создаем запись файла
+        if file:
+            RepairRequestFile.objects.create(
+                repair_request=repair_request,
+                file=file,
+                uploaded_by=user,
+                description=file_description or ''
+            )
+
+        return repair_request
     @staticmethod
     def update_request(request_id: int, data, user):
         try:
