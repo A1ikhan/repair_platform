@@ -8,6 +8,8 @@ django-cors-headers==4.8.0
 django-ninja==1.4.3
 django-ninja-extra==0.30.1
 django-ninja-jwt==5.3.7
+djangorestframework==3.16.1
+djangorestframework_simplejwt==5.5.1
 gunicorn==23.0.0
 injector==0.22.0
 packaging==25.0
