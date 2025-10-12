@@ -55,3 +55,42 @@ class ReviewService:
             return Review.objects.filter(worker=worker).select_related('customer')
         except User.DoesNotExist:
             raise HttpError(404, "Worker not found")
+
+    @staticmethod
+    def update_review(review_id: int, data, customer):
+        """Обновить отзыв (только автор отзыва)"""
+        try:
+            review = Review.objects.get(id=review_id, customer=customer)
+
+            review.rating = data.rating
+            review.comment = data.comment or ''
+            review.save()
+
+            # Обновляем рейтинг работника
+            ReviewService._update_worker_rating(review.worker)
+
+            return review
+
+        except Review.DoesNotExist:
+            raise HttpError(404, "Review not found or you don't have permission")
+
+    @staticmethod
+    def delete_review(review_id: int, customer):
+        """Удалить отзыв (только автор отзыва)"""
+        try:
+            review = Review.objects.get(id=review_id, customer=customer)
+            worker = review.worker  # сохраняем работника для обновления рейтинга
+            review.delete()
+
+            # Обновляем рейтинг работника после удаления
+            ReviewService._update_worker_rating(worker)
+
+            return {"message": "Review deleted successfully"}
+
+        except Review.DoesNotExist:
+            raise HttpError(404, "Review not found or you don't have permission")
+
+    @staticmethod
+    def get_my_reviews(customer):
+        """Получить отзывы, оставленные текущим пользователем"""
+        return Review.objects.filter(customer=customer).select_related('worker', 'repair_request')
