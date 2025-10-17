@@ -2,7 +2,9 @@ from ninja import NinjaAPI
 from back.dependencies import AuthBearer
 
 # Импортируем саброутеры
-from back.endpoints import auth, repairs, responses, reviews, notification, workers
+from back.endpoints import auth, repairs, responses, reviews, notification, workers, chat,userlist
+
+
 
 api = NinjaAPI(
     title="Repair Platform API",
@@ -10,6 +12,7 @@ api = NinjaAPI(
     description="API for appliance repair service platform",
     auth=AuthBearer(),
     csrf=True,
+    docs_url="/docs",
 )
 
 # Подключаем роутеры
@@ -19,18 +22,14 @@ api.add_router("/responses", responses.router)
 api.add_router("/reviews", reviews.router)
 api.add_router("/notifications", notification.router)
 api.add_router("/workers", workers.router)
+api.add_router("/chat", chat.router)
+api.add_router("/userlist", userlist.router)
 
 # Тестовые эндпоинты
-
-# Импортируем саброутеры
-from .api import auth, repairs, responses, reviews, notification, workers
-
-
-@api.get("/protected/test",tags=["test"])
+@api.get("/protected/test", tags=["test"])
 def test_protected(request):
     return {"message": f"Hello {request.user.username}!"}
 
-@api.get("/public/hello", auth=None,tags=["test"])
+@api.get("/public/hello", auth=None, tags=["test"])
 def hello_public(request):
     return {"message": "Hello from Repair Platform API!"}
-

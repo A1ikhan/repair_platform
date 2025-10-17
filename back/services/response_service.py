@@ -3,6 +3,8 @@ from back.models import RepairRequest
 from .notification_service import NotificationService
 from back import models
 
+from .userlist_service import AutoListService
+
 
 class ResponseService:
     @staticmethod
@@ -21,6 +23,7 @@ class ResponseService:
             )
 
             NotificationService.notify_new_response(repair_request, response)
+            AutoListService.handle_response_created(response)
             return response
 
         except RepairRequest.DoesNotExist:
@@ -60,6 +63,7 @@ class ResponseService:
             ).exclude(id=response_id).update(status='rejected')
 
             NotificationService.notify_response_accepted(response)
+            AutoListService.handle_response_accepted(response)
             return response
 
         except models.Response.DoesNotExist:

@@ -4,3 +4,5 @@ from .repair_request_service import RepairRequestService
 from .response_service import ResponseService
 from .review_service import ReviewService
 from .notification_service import NotificationService
+from .chat_service import ChatService
+from .userlist_service import UserListService

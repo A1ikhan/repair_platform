@@ -4,6 +4,9 @@ from django.db import models
 
 from back.models.repair_requests_models import RepairRequestFile
 
+from back.models import Response
+from back.services.userlist_service import AutoListService
+
 
 class RepairRequestService:
     @staticmethod
@@ -50,6 +53,35 @@ class RepairRequestService:
             return repair_request
         except RepairRequest.DoesNotExist:
             raise HttpError(404, "Repair request not found or you don't have permission")
+
+    @staticmethod
+    def complete_request(request_id: int, user):
+        """Завершить заявку (только автор или принятый работник)"""
+        try:
+            repair_request = RepairRequest.objects.get(id=request_id)
+
+            # Проверяем права
+            can_complete = (
+                    user == repair_request.created_by or
+                    Response.objects.filter(
+                        repair_request=repair_request,
+                        worker=user,
+                        status='accepted'
+                    ).exists()
+            )
+
+            if not can_complete:
+                raise HttpError(403, "No permission to complete this request")
+
+            repair_request.status = 'completed'
+            repair_request.save()
+
+            # Автоматически управляем списками
+            AutoListService.handle_request_completed(repair_request)
+
+            return repair_request
+        except RepairRequest.DoesNotExist:
+            raise HttpError(404, "Repair request not found")
 
     @staticmethod
     def delete_request(request_id: int, user):

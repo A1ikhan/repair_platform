@@ -9,6 +9,8 @@ services:
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
+    env_file:
+      - .env
     ports:
       - "8000:8000"
 #    environment:
