@@ -6,17 +6,17 @@ from back.services import ChatService
 
 router = Router(tags=["Chat"])
 
-@router.post("/request/{repair_request_id}", response=ChatMessageSchemaOut, auth=None)
+@router.post("/request/{repair_request_id}", response=ChatMessageSchemaOut)
 def send_chat_message(request, repair_request_id: int, data: ChatMessageSchemaIn):
     """Send message in repair request chat"""
     return ChatService.send_message(repair_request_id, data.message, request.user)
 
-@router.get("/request/{repair_request_id}", response=list[ChatMessageSchemaOut], auth=None)
+@router.get("/request/{repair_request_id}", response=list[ChatMessageSchemaOut])
 def get_chat_messages(request, repair_request_id: int):
     """Get chat messages for repair request"""
     return ChatService.get_chat_messages(repair_request_id, request.user)
 
-@router.post("/request/{repair_request_id}/read", response=dict, auth=None)
+@router.post("/request/{repair_request_id}/read", response=dict)
 def mark_chat_as_read(request, repair_request_id: int):
     """Mark chat messages as read"""
     return ChatService.mark_messages_as_read(repair_request_id, request.user)

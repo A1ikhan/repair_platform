@@ -46,8 +46,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'back',
     'corsheaders',
-    'rest_framework',  # Добавьте Django REST Framework
-    'rest_framework_simplejwt',  # Добавьте Simple JWT
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'imagekit',
 ]
 
 MIDDLEWARE = [

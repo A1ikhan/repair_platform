@@ -26,21 +26,23 @@ class RepairRequestService:
 
 
     @staticmethod
-    def create_request(data, user,file=None, file_description=None):
+    def create_request(data, user, files: list = None, file_descriptions: list = None, is_public: bool = True):
+        # Создаем саму заявку
         repair_request = RepairRequest.objects.create(
             **data.dict(),
             created_by=user,
             status='new'
         )
 
-        # Если передан файл, создаем запись файла
-        if file:
-            RepairRequestFile.objects.create(
-                repair_request=repair_request,
-                file=file,
-                uploaded_by=user,
-                description=file_description or ''
-            )
+        if files:
+            for i, file in enumerate(files):
+                RepairRequestFile.objects.create(
+                    repair_request=repair_request,
+                    file=file,
+                    uploaded_by=user,
+                    description=(file_descriptions[i] if file_descriptions and i < len(file_descriptions) else ''),
+                    is_public=is_public
+                )
 
         return repair_request
     @staticmethod

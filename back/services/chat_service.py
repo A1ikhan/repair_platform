@@ -1,7 +1,7 @@
 from ninja.errors import HttpError
-from ninja.responses import Response
 
-from back.models import RepairRequest
+from back import models
+from back.models import RepairRequest, Response
 from back.models.chat_model import ChatMessage
 from back.services.notification_service import NotificationService
 
@@ -33,15 +33,12 @@ class ChatService:
     @staticmethod
     def _has_chat_access(repair_request, user):
         # Доступ имеют: автор заявки и принятый работник
-        if user == repair_request.created_by:
+        if repair_request.created_by == user:
             return True
-
+        if models.Response.objects.filter(repair_request=repair_request, worker=user).exists():
+            return True
         # Проверяем, есть ли принятый отклик от этого пользователя
-        return Response.objects.filter(
-            repair_request=repair_request,
-            worker=user,
-            status='accepted'
-        ).exists()
+        return False
 
     @staticmethod
     def _notify_new_message(repair_request, message, sender):
@@ -89,10 +86,8 @@ class ChatService:
 
             # Помечаем все сообщения не от пользователя как прочитанные
             ChatMessage.objects.filter(
-                repair_request=repair_request,
-                sender__ne=user,
-                is_read=False
-            ).update(is_read=True)
+                repair_request_id=repair_request_id
+            ).exclude(sender=user).update(is_read=True)
 
             return {"message": "Messages marked as read"}
 

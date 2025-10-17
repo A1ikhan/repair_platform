@@ -1,6 +1,8 @@
 # Эндпоинты пользовательских списков
 from ninja import Router
+from ninja.errors import HttpError
 
+from back.models import UserList, ListItem
 from back.schemas import RepairRequestSchemaOut
 from back.schemas import UserListSchemaOut, ListItemSchemaOut, ListItemSchemaIn
 from back.services import RepairRequestService
@@ -12,10 +14,24 @@ def get_my_lists(request):
     """Get all user lists"""
     return UserListService.get_user_lists(request.user)
 
-@router.get("/lists/{list_name}", response=dict, auth=None)
-def get_list_items(request):
-    """Get items from specific list"""
-    return UserListService.get_list_items(request.user)
+
+def get_list_items(user, list_name: str):
+    """Получить элементы конкретного списка пользователя"""
+    # Создаём стандартные списки, если их ещё нет
+    UserListService.get_or_create_user_lists(user)
+
+    try:
+        user_list = UserList.objects.get(user=user, name=list_name)
+    except UserList.DoesNotExist:
+        raise HttpError(404, f"List '{list_name}' not found")
+
+    # Загружаем элементы списка с заявками и пользователями
+    queryset = ListItem.objects.filter(
+        user_list=user_list
+    ).select_related('repair_request', 'repair_request__created_by')
+
+    # Преобразуем ORM-объекты в схемы (Pydantic модели)
+    return [ListItemSchemaOut.from_orm(item) for item in queryset]
 
 @router.post("/lists/{list_name}/items", response=ListItemSchemaOut, auth=None)
 def add_to_list(request, list_name: str, data: ListItemSchemaIn):
@@ -62,7 +78,7 @@ def move_between_lists(
     )
 
 # Специальные эндпоинты для частых операций
-@router.get("/favorites", response=dict, auth=None)
+@router.get("/favorites", response=list[ListItemSchemaOut], auth=None)
 def get_favorites(request):
     """Get user's favorite repair requests"""
     return UserListService.get_user_favorites(request.user)

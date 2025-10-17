@@ -1,3 +1,4 @@
+requests
 annotated-types==0.7.0
 asgiref==3.9.1
 cffi==2.0.0

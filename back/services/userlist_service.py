@@ -19,6 +19,7 @@ class UserListService:
 
     @staticmethod
     def get_user_lists(user):
+        UserListService.get_or_create_user_lists(user)
         """Получить все списки пользователя"""
         return UserList.objects.filter(user=user).prefetch_related('items')
 
@@ -69,6 +70,7 @@ class UserListService:
 
     @staticmethod
     def get_list_items(user, list_name: str):
+        UserListService.get_or_create_user_lists(user)
         """Получить элементы списка с пагинацией"""
         user_list = UserListService.get_list_by_name(user, list_name)
         queryset = ListItem.objects.filter(

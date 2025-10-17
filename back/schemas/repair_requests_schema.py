@@ -31,6 +31,8 @@ class RepairRequestSchemaOut(Schema):
     description: str
     device_type: str
     address: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     desired_completion_date: Optional[date] = None
     status: str
     created_by: UserSchema
