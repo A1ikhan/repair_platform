@@ -1,3 +1,4 @@
+from django.views.decorators.csrf import csrf_exempt
 from ninja import Router
 from back.schemas import Message, UserCreate, LoginInput, TokenOutput
 from back.services.auth_service import AuthService
@@ -5,12 +6,14 @@ from back.services.auth_service import AuthService
 router = Router(tags=["Auth"])
 
 @router.post("/register", response={200: Message, 400: Message}, auth=None)
+@csrf_exempt
 def register(request, data: UserCreate):
     """Register new user with activity tracking"""
     AuthService.register_user(data, data.user_type, request)
     return 200, {"message": "User created successfully"}
 
 @router.post("/login", response=TokenOutput, auth=None)
+@csrf_exempt
 def login(request, data: LoginInput):
     """Login user with activity tracking"""
     return AuthService.login_user(data.username, data.password, request)

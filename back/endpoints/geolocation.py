@@ -10,19 +10,19 @@ from back.dependencies import customer_required, worker_required
 router = Router(tags=["Geolocation"])
 
 
-@router.post("/location/update", response=GeocodeResponse, auth=None)
+@router.post("/location/update", response=GeocodeResponse)
 def update_my_location(request, data: LocationUpdateSchema):
     """Обновить местоположение пользователя"""
     return LocationService.update_user_location(request.user, data.address)
 
 
-@router.get("/location/me", response=LocationResponse, auth=None)
+@router.get("/location/me", response=LocationResponse)
 def get_my_location(request):
     """Получить мое местоположение"""
     return LocationService.get_user_location(request.user)
 
 
-@router.get("/workers/nearby", response=List[NearbyWorkersResponse], auth=None)
+@router.get("/workers/nearby", response=List[NearbyWorkersResponse])
 def get_nearby_workers(request, address: str, max_distance: int = 10):
     """Найти работников поблизости"""
     from back.services.geolocation_service import DGisService
@@ -40,13 +40,13 @@ def get_nearby_workers(request, address: str, max_distance: int = 10):
     )
 
 
-@router.get("/shops/parts/nearby", response=List[PartsShopSchema], auth=None)
+@router.get("/shops/parts/nearby", response=List[PartsShopSchema])
 def get_nearby_parts_shops(request, lat: float, lon: float, part_name: Optional[str] = None):
     """Найти магазины запчастей поблизости"""
     return LocationService.search_nearby_parts_shops(lat, lon, part_name)
 
 
-@router.post("/workers/{worker_id}/service-area", response=Message, auth=None)
+@router.post("/workers/{worker_id}/service-area", response=Message)
 def add_service_area(request, worker_id: int, city: str, radius_km: int = 10):
     """Добавить зону обслуживания для работника"""
     from back.models.geolocation_models import ServiceArea
@@ -65,7 +65,7 @@ def add_service_area(request, worker_id: int, city: str, radius_km: int = 10):
     return {"message": "Service area added successfully"}
 
 
-@router.delete("/location/me", response=Message, auth=None)
+@router.delete("/location/me", response=Message)
 def delete_my_location(request):
     """Удалить мою локацию"""
     from back.models.geolocation_models import UserLocation
