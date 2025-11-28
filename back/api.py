@@ -4,7 +4,7 @@ from back.dependencies import AuthBearer
 # Импортируем саброутеры
 from back.endpoints import (auth, repairs, responses, reviews,
                             notification, workers, chat, userlist,
-                            users, geolocation,ai_preparation)
+                            users, geolocation, ai_preparation, bookmarks)
 
 api = NinjaAPI(
     title="Repair Platform API",
@@ -26,7 +26,8 @@ api.add_router("/chat", chat.router)
 api.add_router("/userlist", userlist.router)
 api.add_router("/users", users.router)
 api.add_router("/geo",geolocation.router)
-api.add_router("ai", ai_preparation.router)
+api.add_router("/ai", ai_preparation.router)
+api.add_router("/bookmarks", bookmarks.router)
 # Тестовые эндпоинты
 @api.get("/protected/test", tags=["test"])
 def test_protected(request):

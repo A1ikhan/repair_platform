@@ -1,5 +1,6 @@
 from ninja.errors import HttpError
-from back.models import RepairRequest
+from back.models import RepairRequest, Response
+from .bookmark_service import BookmarkService
 from .notification_service import NotificationService
 from back import models
 
@@ -44,8 +45,31 @@ class ResponseService:
 
     @staticmethod
     def get_worker_responses(worker):
-        return models.Response.objects.filter(worker=worker).select_related('repair_request')
+        """Получить отклики работника с информацией о закладках"""
+        responses = Response.objects.filter(worker=worker).select_related(
+            'repair_request',
+            'repair_request__created_by'
+        ).order_by('-created_at')
 
+        # Обогащаем информацией о закладках
+        return BookmarkService.enrich_responses_with_bookmarks(worker, responses)
+
+    @staticmethod
+    def get_response_with_bookmarks(response_id: int, user):
+        """Получить отклик с информацией о закладках"""
+        try:
+            response = Response.objects.select_related(
+                'repair_request',
+                'repair_request__created_by'
+            ).get(id=response_id)
+
+            # Обогащаем информацией о закладках
+            enriched = BookmarkService.enrich_responses_with_bookmarks(user, [response])
+            return enriched[0] if enriched else None
+
+        except Response.DoesNotExist:
+            raise HttpError(404, "Response not found")
+        
     @staticmethod
     def accept_response(response_id: int, customer):
         try:

@@ -14,3 +14,6 @@ from .userlist_schema import (UserListSchemaIn,UserListSchemaOut,UserListDetailS
 from .geolocation_schema import (LocationSchema,LocationUpdateSchema,NearbyWorkersResponse,GeocodeResponse,
                                  PartsShopSchema,LocationResponse)
 
+from .bookmark_schema import (BookmarkFolderSchema, BookmarkFolderCreate, BookmarkFolderUpdate,
+    BookmarkSchema, BookmarkCreate, BookmarkUpdate,
+    BookmarkStatsSchema, BookmarkFilterSchema)
