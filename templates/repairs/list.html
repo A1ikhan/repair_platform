@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+
+{% block title %}Все заявки - Repair Platform{% endblock %}
+
+{% block extra_css %}
+<style>
+    .requests-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+    
+    .filters-container {
+        margin-bottom: 30px;
+    }
+    
+    .no-requests {
+        text-align: center;
+        padding: 50px;
+        color: #666;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="requests-header">
+    <h2>📋 Все заявки на ремонт</h2>
+    {% if user.is_authenticated %}
+    <a href="{% url 'create_repair' %}" class="btn btn-success">➕ Создать заявку</a>
+    {% endif %}
+</div>
+
+<div class="filters-container">
+    <div class="filter-row">
+        <div class="filter-group">
+            <label>Поиск</label>
+            <input type="text" id="search-input" placeholder="Поиск по названию или описанию...">
+        </div>
+        <div class="filter-group">
+            <label>Тип устройства</label>
+            <select id="device-type-filter">
+                <option value="">Все типы</option>
+                <option value="fridge">Холодильник</option>
+                <option value="washer">Стиральная машина</option>
+                <option value="oven">Духовка</option>
+                <option value="dishwasher">Посудомоечная машина</option>
+                <option value="other">Другое</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Статус</label>
+            <select id="status-filter">
+                <option value="">Все статусы</option>
+                <option value="new">Новая</option>
+                <option value="active">В работе</option>
+                <option value="completed">Завершена</option>
+                <option value="cancelled">Отменена</option>
+            </select>
+        </div>
+        <button onclick="loadRequests()" class="btn btn-secondary">Применить фильтры</button>
+    </div>
+</div>
+
+<div id="requests-container">
+    <div class="loading">
+        <div class="spinner"></div>
+        <p>Загрузка заявок...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        loadRequests();
+    });
+    
+    async function loadRequests() {
+        const container = document.getElementById('requests-container');
+        container.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка заявок...</p>
+            </div>
+        `;
+        
+        const search = document.getElementById('search-input').value;
+        const deviceType = document.getElementById('device-type-filter').value;
+        const status = document.getElementById('status-filter').value;
+        
+        let url = `${API_BASE_URL}/repairs/`;
+        const params = new URLSearchParams();
+        
+        if (search) params.append('search', search);
+        if (deviceType) params.append('device_type', deviceType);
+        if (status) params.append('status', status);
+        
+        if (params.toString()) {
+            url = `${API_BASE_URL}/repairs/search?${params.toString()}`;
+        }
+        
+        try {
+            const response = await fetch(url);
+            const requests = await response.json();
+            
+            if (requests.length === 0) {
+                container.innerHTML = `
+                    <div class="no-requests">
+                        <h3>Заявок не найдено</h3>
+                        <p>Попробуйте изменить параметры поиска</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            renderRequests(requests, container);
+            
+        } catch (error) {
+            container.innerHTML = `
+                <div class="alert alert-error">
+                    Ошибка загрузки: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    function renderRequests(requests, container) {
+        container.innerHTML = '<div class="requests-grid"></div>';
+        const grid = container.querySelector('.requests-grid');
+        
+        requests.forEach(request => {
+            const card = createRequestCard(request, false);
+            grid.appendChild(card);
+        });
+    }
+    
+    function createRequestCard(request, isMyRequest = false) {
+        const card = document.createElement('div');
+        card.className = 'request-card';
+        
+        const statusClass = `status-${request.status}`;
+        const statusText = {
+            'new': 'Новая',
+            'active': 'В работе',
+            'completed': 'Завершена',
+            'cancelled': 'Отменена'
+        }[request.status] || request.status;
+        
+        const deviceText = {
+            'fridge': 'Холодильник',
+            'washer': 'Стиральная машина',
+            'oven': 'Духовка',
+            'dishwasher': 'Посудомоечная машина',
+            'other': 'Другое'
+        }[request.device_type] || request.device_type;
+        
+        const date = new Date(request.created_at).toLocaleDateString('ru-RU');
+        
+        card.innerHTML = `
+            <div class="request-status ${statusClass}">${statusText}</div>
+            <h3>${request.title}</h3>
+            <div class="device-badge">${deviceText}</div>
+            
+            <div class="request-meta">
+                <div>👤 ${request.created_by?.username || 'Неизвестно'}</div>
+                <div>📅 ${date}</div>
+                <div>📍 ${request.address.substring(0, 30)}...</div>
+            </div>
+            
+            <div class="request-description">
+                ${request.description.substring(0, 100)}...
+            </div>
+            
+            ${request.predicted_price ? `
+                <div style="margin: 10px 0;">
+                    <strong>Примерная цена:</strong> ${request.predicted_price} ₽
+                    <small>(уверенность: ${(request.price_confidence * 100).toFixed(0)}%)</small>
+                </div>
+            ` : ''}
+            
+            <div class="request-actions">
+                <button onclick="viewRequestDetails(${request.id})" class="btn btn-small">👁️ Подробнее</button>
+                ${isMyRequest ? `
+                    <button onclick="editRequest(${request.id})" class="btn btn-small btn-secondary">✏️ Изменить</button>
+                    <button onclick="deleteRequest(${request.id})" class="btn btn-small btn-danger">🗑️ Удалить</button>
+                ` : ''}
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    async function viewRequestDetails(requestId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/repairs/${requestId}`);
+            const request = await response.json();
+            
+            if (response.ok) {
+                const deviceText = {
+                    'fridge': 'Холодильник',
+                    'washer': 'Стиральная машина',
+                    'oven': 'Духовка',
+                    'dishwasher': 'Посудомоечная машина',
+                    'other': 'Другое'
+                }[request.device_type] || request.device_type;
+                
+                const statusText = {
+                    'new': 'Новая',
+                    'active': 'В работе',
+                    'completed': 'Завершена',
+                    'cancelled': 'Отменена'
+                }[request.status] || request.status;
+                
+                const content = `
+                    <div style="margin-bottom: 20px;">
+                        <span class="status-${request.status}" style="margin-bottom: 10px; display: inline-block;">
+                            ${statusText}
+                        </span>
+                        <h4>${request.title}</h4>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <p><strong>Тип устройства:</strong> ${deviceText}</p>
+                        <p><strong>Создатель:</strong> ${request.created_by?.username || 'Неизвестно'}</p>
+                        <p><strong>Дата создания:</strong> ${new Date(request.created_at).toLocaleString('ru-RU')}</p>
+                        ${request.desired_completion_date ? 
+                            `<p><strong>Желаемая дата:</strong> ${request.desired_completion_date}</p>` : ''}
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h5>Описание проблемы:</h5>
+                        <p>${request.description}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h5>Адрес:</h5>
+                        <p>${request.address}</p>
+                    </div>
+                    
+                    ${request.predicted_price ? `
+                        <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h5>Оценка цены:</h5>
+                            <p><strong>Примерная стоимость:</strong> ${request.predicted_price} ₽</p>
+                            <p><strong>Уверенность:</strong> ${(request.price_confidence * 100).toFixed(0)}%</p>
+                        </div>
+                    ` : ''}
+                `;
+                
+                openRequestModal(content, request.title);
+            }
+        } catch (error) {
+            showAlert('Ошибка загрузки данных заявки', 'error');
+        }
+    }
+</script>
+{% endblock %}
