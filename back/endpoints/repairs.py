@@ -68,3 +68,49 @@ def search_repair_requests(request, search: str = None, device_type: str = None,
 def get_available_filters(request):
     """Получить доступные фильтры для заявок"""
     return RepairRequestService.get_available_filters()
+
+
+# back/api.py или back/endpoints/repairs.py
+
+@router.get("/", response=list[RepairRequestSchemaOut], auth=None)
+def list_repair_requests(request):
+    """Получить все заявки на ремонт"""
+    return RepairRequestService.get_all_requests()
+
+
+@router.get("/search", response=list[RepairRequestSchemaOut], auth=None)
+def search_repair_requests(request, search: str = None, device_type: str = None, status: str = None):
+    """Поиск заявок по ключевым словам, типу устройства и статусу"""
+    return RepairRequestService.search_requests(search, device_type, status)
+
+
+@router.get("/{request_id}", response=RepairRequestSchemaOut, auth=None)
+def get_repair_request(request, request_id: int):
+    """Получить конкретную заявку по ID"""
+    return RepairRequestService.get_request_by_id(request_id)
+
+
+@router.get("/my/requests", response=list[RepairRequestSchemaOut])
+def get_my_requests(request):
+    """Получить все заявки текущего пользователя"""
+    return RepairRequestService.get_user_requests(request.user)
+
+
+@router.post("/", response=RepairRequestSchemaOut)
+def create_repair_request(
+        request,
+        data: str = Form(...),  # JSON строка
+        files: List[UploadedFile] = File(None),
+        is_public: bool = Form(True)
+):
+    """Создать новую заявку"""
+    import json
+    user = request.user
+    data_dict = json.loads(data)
+
+    return RepairRequestService.create_request(
+        data=RepairRequestSchemaIn(**data_dict),
+        user=user,
+        files=files,
+        is_public=is_public
+    )

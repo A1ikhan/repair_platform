@@ -20,10 +20,22 @@ from django.contrib import admin
 from django.urls import path
 
 from back.api import api
+from back.frontend_views import index, login_view, register_view, repairs_list_view, my_repairs_view, \
+    create_repair_view, profile_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', api.urls),
-] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+    path('', index, name='index'),
+    path('login/', login_view, name='login'),
+    path('register/', register_view, name='register'),
+    path('repairs/', repairs_list_view, name='repairs_list'),
+    path('repairs/my/', my_repairs_view, name='my_repairs'),
+    path('repairs/create/', create_repair_view, name='create_repair'),
+    path('profile/', profile_view, name='profile'),
+
+
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 

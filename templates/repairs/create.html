@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+
+{% block title %}Создать заявку - Repair Platform{% endblock %}
+
+{% block content %}
+<div class="create-container">
+    <h2>➕ Создать новую заявку</h2>
+    
+    {% if not user.is_authenticated %}
+    <div class="alert alert-info">
+        <p>Для создания заявки необходимо <a href="{% url 'login' %}">войти в систему</a>.</p>
+    </div>
+    {% else %}
+    <form id="create-request-form">
+        <div class="form-group">
+            <label for="title">Название проблемы *</label>
+            <input type="text" id="title" name="title" required placeholder="Например: Не работает холодильник">
+        </div>
+        
+        <div class="form-group">
+            <label for="device_type">Тип устройства *</label>
+            <select id="device_type" name="device_type" required>
+                <option value="">Выберите тип устройства</option>
+                <option value="fridge">Холодильник</option>
+                <option value="washer">Стиральная машина</option>
+                <option value="oven">Духовка</option>
+                <option value="dishwasher">Посудомоечная машина</option>
+                <option value="other">Другое</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="description">Описание проблемы *</label>
+            <textarea id="description" name="description" required rows="5" placeholder="Подробно опишите проблему..."></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="address">Адрес *</label>
+            <textarea id="address" name="address" required rows="3" placeholder="Введите адрес для ремонта"></textarea>
+        </div>
+        
+        <div class="form-group">
+            <label for="desired_completion_date">Желаемая дата выполнения</label>
+            <input type="date" id="desired_completion_date" name="desired_completion_date">
+        </div>
+        
+        <div class="form-group">
+            <label>Прикрепить фото проблемы (опционально)</label>
+            <input type="file" id="photos" name="photos" multiple accept="image/*">
+            <small class="text-muted">Можно выбрать несколько файлов</small>
+        </div>
+        
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" id="is_public" name="is_public" checked>
+                <span>Сделать заявку публичной</span>
+            </label>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-success">Создать заявку</button>
+            <a href="{% url 'my_repairs' %}" class="btn btn-secondary">Отмена</a>
+        </div>
+    </form>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('create-request-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            showAlert('Пожалуйста, войдите в систему', 'error');
+            return;
+        }
+        
+        const formData = new FormData();
+        const requestData = {
+            title: document.getElementById('title').value,
+            description: document.getElementById('description').value,
+            device_type: document.getElementById('device_type').value,
+            address: document.getElementById('address').value,
+            desired_completion_date: document.getElementById('desired_completion_date').value || null
+        };
+        
+        // Добавляем данные формы
+        formData.append('data', JSON.stringify(requestData));
+        
+        // Добавляем файлы
+        const photoInput = document.getElementById('photos');
+        if (photoInput.files.length > 0) {
+            for (let file of photoInput.files) {
+                formData.append('files', file);
+            }
+        }
+        
+        formData.append('is_public', document.getElementById('is_public').checked);
+        
+        const submitBtn = this.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Создание...';
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/repairs/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                    // Не устанавливаем Content-Type, FormData сделает это автоматически
+                },
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showAlert('Заявка успешно создана!', 'success');
+                
+                // Переходим на страницу моих заявок
+                setTimeout(() => {
+                    window.location.href = '{% url "my_repairs" %}';
+                }, 1500);
+                
+            } else {
+                showAlert(data.message || 'Ошибка создания заявки', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Создать заявку';
+            }
+        } catch (error) {
+            showAlert('Ошибка соединения: ' + error.message, 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Создать заявку';
+        }
+    });
+</script>
+{% endblock %}

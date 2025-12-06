@@ -16,7 +16,13 @@ def register(request, data: UserCreate):
 @csrf_exempt
 def login(request, data: LoginInput):
     """Login user with activity tracking"""
-    return AuthService.login_user(data.username, data.password, request)
+    response = AuthService.login_user(data.username, data.password, request)
+
+    # Для фронтенда можно добавить CORS headers
+    response["Access-Control-Allow-Origin"] = "http://localhost:8000"
+    response["Access-Control-Allow-Credentials"] = "true"
+
+    return response
 
 @router.post("/refresh", response=TokenOutput, auth=None)
 def refresh_token(request, refresh_token: str):

@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block title %}Профиль - Repair Platform{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <h2>⚙️ Профиль пользователя</h2>
+    
+    {% if not user.is_authenticated %}
+    <div class="alert alert-info">
+        <p>Пожалуйста, <a href="{% url 'login' %}">войдите в систему</a> для просмотра профиля.</p>
+    </div>
+    {% else %}
+    <div class="profile-card">
+        <div class="profile-header">
+            <div class="profile-avatar">
+                {{ user.username|slice:":1"|upper }}
+            </div>
+            <div class="profile-info">
+                <h3>{{ user.first_name|default:"" }} {{ user.last_name|default:"" }}</h3>
+                <p class="profile-username">@{{ user.username }}</p>
+            </div>
+        </div>
+
+        <div class="profile-details">
+            <div class="detail-row">
+                <span class="detail-label">Email:</span>
+                <span class="detail-value">{{ user.email|default:"Не указан" }}</span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">Тип пользователя:</span>
+                <span class="detail-value">
+                    {% if user.user_type == 'customer' %}
+                    Клиент
+                    {% elif user.user_type == 'worker' %}
+                    Работник
+                    {% else %}
+                    Неизвестно
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="detail-row">
+                <span class="detail-label">Дата регистрации:</span>
+                <span class="detail-value" id="registration-date">Загрузка...</span>
+            </div>
+        </div>
+
+        <div class="profile-stats">
+            <div class="stat-item">
+                <span class="stat-number" id="total-requests">0</span>
+                <span class="stat-label">Всего заявок</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="active-requests">0</span>
+                <span class="stat-label">Активные</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-number" id="completed-requests">0</span>
+                <span class="stat-label">Завершённые</span>
+            </div>
+        </div>
+
+        <div class="profile-actions">
+            <button onclick="logout()" class="btn btn-danger">🚪 Выйти из системы</button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if user.is_authenticated %}
+        loadProfileData();
+        {% endif %}
+    });
+
+    async function loadProfileData() {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+
+        try {
+            // Загружаем заявки пользователя для статистики
+            const response = await fetch(`${API_BASE_URL}/repairs/my/requests`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                const requests = await response.json();
+
+                // Статистика
+                document.getElementById('total-requests').textContent = requests.length;
+                document.getElementById('active-requests').textContent =
+                    requests.filter(r => r.status === 'active').length;
+                document.getElementById('completed-requests').textContent =
+                    requests.filter(r => r.status === 'completed').length;
+            }
+
+            // Получаем дату регистрации из localStorage
+            const userData = JSON.parse(localStorage.getItem('user') || '{}');
+            if (userData.date_joined) {
+                const date = new Date(userData.date_joined);
+                document.getElementById('registration-date').textContent =
+                    date.toLocaleDateString('ru-RU');
+            }
+
+        } catch (error) {
+            console.error('Ошибка загрузки данных профиля:', error);
+        }
+    }
+
+    async function logout() {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            window.location.href = '{% url "login" %}';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            // Очищаем данные независимо от ответа сервера
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+
+            showAlert('Вы вышли из системы', 'success');
+
+            setTimeout(() => {
+                window.location.href = '{% url "index" %}';
+            }, 1000);
+
+        } catch (error) {
+            // Все равно очищаем данные и перенаправляем
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+            window.location.href = '{% url "index" %}';
+        }
+    }
+</script>
+{% endblock %}
