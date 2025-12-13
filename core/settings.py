@@ -182,6 +182,12 @@ SIMPLE_JWT = {
 
 if not DEBUG:
     # Security settings for production
+    SESSION_ENGINE = 'django.contrib.sessions.backends.db'  # или 'django.contrib.sessions.backends.cached_db'
+    SESSION_COOKIE_NAME = 'sessionid'
+    SESSION_COOKIE_AGE = 1209600  # 2 недели в секундах
+    SESSION_SAVE_EVERY_REQUEST = False
+    SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

@@ -1,0 +1,710 @@
+{% extends 'base.html' %}
+
+{% block title %}Чат по заявке #{{ request_id }} - Repair Platform{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        max-width: 800px;
+        margin: 0 auto;
+        height: calc(100vh - 200px);
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .chat-header {
+        background: #667eea;
+        color: white;
+        padding: 15px 20px;
+        border-radius: 10px 10px 0 0;
+        margin-bottom: 0;
+    }
+    
+    .chat-header h2 {
+        margin: 0;
+        font-size: 18px;
+    }
+    
+    .back-link {
+        margin-top: 10px;
+    }
+    
+    .back-link a {
+        color: rgba(255, 255, 255, 0.9);
+        text-decoration: none;
+    }
+    
+    .back-link a:hover {
+        text-decoration: underline;
+    }
+    
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        background: #f8f9fa;
+        border-left: 1px solid #eaeaea;
+        border-right: 1px solid #eaeaea;
+    }
+    
+    .message {
+        margin-bottom: 15px;
+        display: flex;
+        flex-direction: column;
+        max-width: 80%;
+    }
+    
+    .message.sent {
+        align-self: flex-end;
+        align-items: flex-end;
+    }
+    
+    .message.received {
+        align-self: flex-start;
+        align-items: flex-start;
+    }
+    
+    .message-content {
+        padding: 12px 15px;
+        border-radius: 18px;
+        position: relative;
+        word-wrap: break-word;
+        max-width: 100%;
+    }
+    
+    .message.sent .message-content {
+        background: #667eea;
+        color: white;
+        border-bottom-right-radius: 4px;
+    }
+    
+    .message.received .message-content {
+        background: white;
+        color: #333;
+        border: 1px solid #eaeaea;
+        border-bottom-left-radius: 4px;
+    }
+    
+    .message-info {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 5px;
+        font-size: 12px;
+        color: #7f8c8d;
+    }
+    
+    .message-time {
+        font-size: 11px;
+    }
+    
+    .message-sender {
+        font-weight: 500;
+    }
+    
+    .message.sent .message-sender {
+        color: #667eea;
+    }
+    
+    .message.received .message-sender {
+        color: #2c3e50;
+    }
+    
+    .no-messages {
+        text-align: center;
+        padding: 40px;
+        color: #7f8c8d;
+    }
+    
+    .chat-input-container {
+        padding: 15px 20px;
+        background: white;
+        border-top: 1px solid #eaeaea;
+        border-radius: 0 0 10px 10px;
+    }
+    
+    .chat-form {
+        display: flex;
+        gap: 10px;
+    }
+    
+    .message-input {
+        flex: 1;
+        padding: 12px 15px;
+        border: 2px solid #eaeaea;
+        border-radius: 24px;
+        font-size: 14px;
+        resize: none;
+        min-height: 24px;
+        max-height: 100px;
+        outline: none;
+    }
+    
+    .message-input:focus {
+        border-color: #667eea;
+    }
+    
+    .send-button {
+        background: #667eea;
+        color: white;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: background 0.3s;
+    }
+    
+    .send-button:hover {
+        background: #5a6fd8;
+    }
+    
+    .send-button:disabled {
+        background: #95a5a6;
+        cursor: not-allowed;
+    }
+    
+    .typing-indicator {
+        padding: 10px 20px;
+        font-style: italic;
+        color: #7f8c8d;
+        font-size: 14px;
+        display: none;
+    }
+    
+    .chat-loading {
+        text-align: center;
+        padding: 40px;
+    }
+    
+    .unread-badge {
+        background: #e74c3c;
+        color: white;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 10px;
+        margin-left: 5px;
+    }
+    
+    .chat-info {
+        background: #f8f9fa;
+        padding: 15px;
+        border-bottom: 1px solid #eaeaea;
+        font-size: 14px;
+        color: #555;
+    }
+    
+    .request-link {
+        color: #667eea;
+        text-decoration: none;
+    }
+    
+    .request-link:hover {
+        text-decoration: underline;
+    }
+    
+    /* Анимация для новых сообщений */
+    @keyframes highlightMessage {
+        0% { background-color: rgba(102, 126, 234, 0.1); }
+        100% { background-color: transparent; }
+    }
+    
+    .message.new {
+        animation: highlightMessage 2s ease-out;
+    }
+    
+    /* Полоса прокрутки */
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+    
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 3px;
+    }
+    
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>💬 Чат по заявке #{{ request_id }}</h2>
+        <div class="back-link">
+            <a href="javascript:history.back()">← Назад к заявке</a>
+        </div>
+    </div>
+    
+    <div id="chat-info" class="chat-info">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Загрузка информации о заявке...</p>
+        </div>
+    </div>
+    
+    <div id="chat-messages" class="chat-messages">
+        <div class="chat-loading">
+            <div class="spinner"></div>
+            <p>Загрузка сообщений...</p>
+        </div>
+    </div>
+    
+    <div id="typing-indicator" class="typing-indicator"></div>
+    
+    <div class="chat-input-container">
+        <form id="chat-form" class="chat-form">
+            <textarea 
+                id="message-input" 
+                class="message-input" 
+                placeholder="Введите сообщение..." 
+                rows="1"
+                maxlength="1000"
+            ></textarea>
+            <button type="submit" id="send-button" class="send-button" disabled>
+                <span>➤</span>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Модальное окно для информации о заявке -->
+<div id="request-info-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Информация о заявке</h3>
+            <button class="modal-close" onclick="closeRequestInfoModal()">&times;</button>
+        </div>
+        <div id="request-info-modal-content">
+            <!-- Контент будет загружен динамически -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const requestId = {{ request_id }};
+    let currentUser = null;
+    let chatInterval = null;
+    let lastMessageId = 0;
+    let isTyping = false;
+    let typingTimeout = null;
+    
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeChat();
+    });
+    
+    async function initializeChat() {
+        // Получаем данные пользователя
+        const userData = localStorage.getItem('user');
+        if (userData) {
+            currentUser = JSON.parse(userData);
+        }
+        
+        // Загружаем информацию о заявке
+        await loadRequestInfo();
+        
+        // Загружаем сообщения
+        await loadMessages();
+        
+        // Начинаем периодическую проверку новых сообщений
+        startChatPolling();
+        
+        // Настраиваем обработчики событий
+        setupEventListeners();
+        
+        // Помечаем сообщения как прочитанные
+        markMessagesAsRead();
+    }
+    
+    async function loadRequestInfo() {
+        const container = document.getElementById('chat-info');
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/repairs/${requestId}`);
+            const request = await response.json();
+            
+            if (response.ok) {
+                const statusText = {
+                    'new': 'Новая',
+                    'active': 'В работе',
+                    'completed': 'Завершена',
+                    'cancelled': 'Отменена'
+                }[request.status] || request.status;
+                
+                container.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>Заявка:</strong> "${request.title}"
+                            <br>
+                            <small>Статус: <span class="status-${request.status}">${statusText}</span></small>
+                        </div>
+                        <div>
+                            <a href="/repairs/${requestId}/" class="request-link">📋 Перейти к заявке</a>
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            container.innerHTML = `
+                <div class="alert alert-error">
+                    Ошибка загрузки информации о заявке: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    async function loadMessages() {
+        const container = document.getElementById('chat-messages');
+        
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <p>Пожалуйста, <a href="/login/">войдите в систему</a> для просмотра чата.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/chat/request/${requestId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки сообщений');
+            }
+            
+            const messages = await response.json();
+            
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="no-messages">
+                        <p>В чате пока нет сообщений</p>
+                        <p>Начните общение первым!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            renderMessages(messages, container);
+            
+            // Сохраняем ID последнего сообщения
+            if (messages.length > 0) {
+                lastMessageId = messages[messages.length - 1].id;
+            }
+            
+            // Прокручиваем к последнему сообщению
+            scrollToBottom();
+            
+        } catch (error) {
+            container.innerHTML = `
+                <div class="alert alert-error">
+                    Ошибка: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    function renderMessages(messages, container) {
+        container.innerHTML = '';
+        
+        messages.forEach(message => {
+            const messageElement = createMessageElement(message);
+            container.appendChild(messageElement);
+        });
+    }
+    
+    function createMessageElement(message) {
+        const isSent = currentUser && message.sender.id === currentUser.id;
+        const messageClass = isSent ? 'message sent' : 'message received';
+        const time = new Date(message.created_at).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        const messageElement = document.createElement('div');
+        messageElement.className = messageClass;
+        messageElement.dataset.messageId = message.id;
+        
+        messageElement.innerHTML = `
+            <div class="message-content">${escapeHtml(message.message)}</div>
+            <div class="message-info">
+                <span class="message-sender">${message.sender.username}</span>
+                <span class="message-time">${time}</span>
+            </div>
+        `;
+        
+        return messageElement;
+    }
+    
+    function setupEventListeners() {
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const chatForm = document.getElementById('chat-form');
+        
+        // Автоматическое изменение высоты textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+            
+            // Активируем/деактивируем кнопку отправки
+            sendButton.disabled = this.value.trim() === '';
+        });
+        
+        // Обработка нажатия Enter (без Shift - отправка, с Shift - новая строка)
+        messageInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (!sendButton.disabled) {
+                    chatForm.dispatchEvent(new Event('submit'));
+                }
+            }
+        });
+        
+        // Отправка сообщения
+        chatForm.addEventListener('submit', sendMessage);
+        
+        // Обработка ввода (для индикатора набора текста)
+        messageInput.addEventListener('input', handleTyping);
+    }
+    
+    async function sendMessage(e) {
+        e.preventDefault();
+        
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const messageText = messageInput.value.trim();
+        
+        if (!messageText) return;
+        
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            showAlert('Пожалуйста, войдите в систему', 'error');
+            return;
+        }
+        
+        // Блокируем форму
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        sendButton.innerHTML = '<span>⏳</span>';
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/chat/request/${requestId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: messageText })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                // Очищаем поле ввода
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                
+                // Добавляем сообщение в чат
+                addMessageToChat(data);
+                
+                // Прокручиваем к последнему сообщению
+                scrollToBottom();
+                
+                // Обновляем lastMessageId
+                lastMessageId = data.id;
+                
+                // Помечаем сообщения как прочитанные
+                markMessagesAsRead();
+                
+            } else {
+                showAlert(data.message || 'Ошибка отправки сообщения', 'error');
+            }
+        } catch (error) {
+            showAlert('Ошибка соединения: ' + error.message, 'error');
+        } finally {
+            // Разблокируем форму
+            messageInput.disabled = false;
+            sendButton.disabled = messageInput.value.trim() === '';
+            sendButton.innerHTML = '<span>➤</span>';
+            messageInput.focus();
+        }
+    }
+    
+    function addMessageToChat(message) {
+        const container = document.getElementById('chat-messages');
+        
+        // Если контейнер пустой (нет сообщений)
+        if (container.querySelector('.no-messages')) {
+            container.innerHTML = '';
+        }
+        
+        const messageElement = createMessageElement(message);
+        messageElement.classList.add('new');
+        container.appendChild(messageElement);
+    }
+    
+    async function checkNewMessages() {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/chat/request/${requestId}?last_id=${lastMessageId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                const messages = await response.json();
+                
+                // Фильтруем только новые сообщения
+                const newMessages = messages.filter(msg => msg.id > lastMessageId);
+                
+                if (newMessages.length > 0) {
+                    // Добавляем новые сообщения
+                    newMessages.forEach(message => {
+                        addMessageToChat(message);
+                    });
+                    
+                    // Обновляем lastMessageId
+                    lastMessageId = newMessages[newMessages.length - 1].id;
+                    
+                    // Прокручиваем к последнему сообщению, если пользователь находится внизу
+                    if (isAtBottom()) {
+                        scrollToBottom();
+                    }
+                    
+                    // Помечаем сообщения как прочитанные
+                    markMessagesAsRead();
+                    
+                    // Показываем уведомление о новых сообщениях
+                    if (!document.hasFocus()) {
+                        showDesktopNotification('Новое сообщение в чате');
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка проверки новых сообщений:', error);
+        }
+    }
+    
+    function startChatPolling() {
+        // Проверяем новые сообщения каждые 3 секунды
+        chatInterval = setInterval(checkNewMessages, 3000);
+        
+        // Также проверяем при возвращении на вкладку
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                checkNewMessages();
+            }
+        });
+    }
+    
+    function stopChatPolling() {
+        if (chatInterval) {
+            clearInterval(chatInterval);
+            chatInterval = null;
+        }
+    }
+    
+    async function markMessagesAsRead() {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+        
+        try {
+            await fetch(`${API_BASE_URL}/chat/request/${requestId}/read`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch (error) {
+            console.error('Ошибка пометки сообщений как прочитанных:', error);
+        }
+    }
+    
+    function handleTyping() {
+        if (!isTyping) {
+            isTyping = true;
+            // TODO: Отправлять событие "пользователь печатает" на сервер
+        }
+        
+        // Сбрасываем таймер
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+        
+        // Устанавливаем новый таймер
+        typingTimeout = setTimeout(() => {
+            isTyping = false;
+            // TODO: Отправлять событие "пользователь закончил печатать" на сервер
+        }, 1000);
+    }
+    
+    function showDesktopNotification(title, options = {}) {
+        // Проверяем поддержку уведомлений
+        if (!("Notification" in window)) {
+            return;
+        }
+        
+        // Проверяем разрешение на показ уведомлений
+        if (Notification.permission === "granted") {
+            new Notification(title, options);
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification(title, options);
+                }
+            });
+        }
+    }
+    
+    function scrollToBottom() {
+        const container = document.getElementById('chat-messages');
+        container.scrollTop = container.scrollHeight;
+    }
+    
+    function isAtBottom() {
+        const container = document.getElementById('chat-messages');
+        const threshold = 100; // Пикселей от низа
+        return container.scrollHeight - container.scrollTop - container.clientHeight < threshold;
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function closeRequestInfoModal() {
+        document.getElementById('request-info-modal').style.display = 'none';
+    }
+    
+    // Очистка при закрытии страницы
+    window.addEventListener('beforeunload', function() {
+        stopChatPolling();
+    });
+    
+    // Функция для перехода к заявке
+    function goToRequest() {
+        window.location.href = `/repairs/${requestId}/`;
+    }
+</script>
+{% endblock %}

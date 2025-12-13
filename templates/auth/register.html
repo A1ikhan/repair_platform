@@ -7,32 +7,34 @@
     <div class="auth-card">
         <h2>📝 Регистрация</h2>
         
-        <form id="register-form">
+        <form method="POST" action="{% url 'register' %}">
+            {% csrf_token %}
+
             <div class="form-group">
                 <label for="username">Логин *</label>
                 <input type="text" id="username" name="username" required>
             </div>
-            
+
             <div class="form-group">
                 <label for="email">Email *</label>
                 <input type="email" id="email" name="email" required>
             </div>
-            
+
             <div class="form-group">
                 <label for="password">Пароль *</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            
+
             <div class="form-group">
                 <label for="first_name">Имя</label>
                 <input type="text" id="first_name" name="first_name">
             </div>
-            
+
             <div class="form-group">
                 <label for="last_name">Фамилия</label>
                 <input type="text" id="last_name" name="last_name">
             </div>
-            
+
             <div class="form-group">
                 <label for="user_type">Тип пользователя *</label>
                 <select id="user_type" name="user_type" required>
@@ -41,10 +43,10 @@
                     <option value="worker">Работник</option>
                 </select>
             </div>
-            
+
             <button type="submit" class="btn btn-block">Зарегистрироваться</button>
         </form>
-        
+
         <div class="auth-links">
             <p>Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a></p>
             <p><a href="{% url 'index' %}">← Вернуться на главную</a></p>
@@ -57,7 +59,7 @@
 <script>
     document.getElementById('register-form').addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const userData = {
             username: document.getElementById('username').value,
             email: document.getElementById('email').value,
@@ -66,28 +68,28 @@
             last_name: document.getElementById('last_name').value,
             user_type: document.getElementById('user_type').value
         };
-        
+
         const submitBtn = this.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         submitBtn.textContent = 'Регистрация...';
-        
+
         try {
             const response = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(userData)
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 showAlert('Регистрация успешна! Теперь вы можете войти.', 'success');
-                
+
                 // Автоматически заполняем форму входа
                 setTimeout(() => {
                     window.location.href = '/login/';
                 }, 1500);
-                
+
             } else {
                 showAlert(data.message || 'Ошибка регистрации', 'error');
                 submitBtn.disabled = false;

@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+
+{% block title %}Отклики на заявку - Repair Platform{% endblock %}
+
+{% block content %}
+<div class="responses-container">
+    <h2>✉️ Отклики на заявку #{{ request_id }}</h2>
+    
+    <div class="back-link">
+        <a href="javascript:history.back()">← Назад</a>
+    </div>
+    
+    <div id="request-info" class="request-info-card">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Загрузка информации о заявке...</p>
+        </div>
+    </div>
+    
+    <div id="responses-container">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Загрузка откликов...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для принятия отклика -->
+<div id="accept-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Принять отклик</h3>
+            <button class="modal-close" onclick="closeAcceptModal()">&times;</button>
+        </div>
+        <div id="accept-modal-content">
+            <p>Вы уверены, что хотите принять этот отклик?</p>
+            <p><strong>Внимание:</strong> Все остальные отклики на эту заявку будут автоматически отклонены.</p>
+            
+            <div class="modal-actions">
+                <button onclick="acceptResponse()" class="btn btn-success">Да, принять</button>
+                <button onclick="closeAcceptModal()" class="btn btn-secondary">Отмена</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const requestId = {{ request_id }};
+    let currentResponseId = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        loadRequestInfo();
+        loadResponses();
+    });
+    
+    async function loadRequestInfo() {
+        const container = document.getElementById('request-info');
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/repairs/${requestId}`);
+            const request = await response.json();
+            
+            if (response.ok) {
+                const statusText = {
+                    'new': 'Новая',
+                    'active': 'В работе',
+                    'completed': 'Завершена',
+                    'cancelled': 'Отменена'
+                }[request.status] || request.status;
+                
+                const deviceText = {
+                    'fridge': 'Холодильник',
+                    'washer': 'Стиральная машина',
+                    'oven': 'Духовка',
+                    'dishwasher': 'Посудомоечная машина',
+                    'other': 'Другое'
+                }[request.device_type] || request.device_type;
+                
+                container.innerHTML = `
+                    <div class="request-card">
+                        <div class="request-header">
+                            <h3>${request.title}</h3>
+                            <span class="status-${request.status}">${statusText}</span>
+                        </div>
+                        
+                        <div class="request-details">
+                            <p><strong>Тип устройства:</strong> ${deviceText}</p>
+                            <p><strong>Создатель:</strong> ${request.created_by?.username || 'Неизвестно'}</p>
+                            <p><strong>Дата создания:</strong> ${new Date(request.created_at).toLocaleDateString('ru-RU')}</p>
+                            ${request.predicted_price ? `
+                                <p><strong>Примерная цена:</strong> ${request.predicted_price} ₽</p>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="request-description">
+                            <strong>Описание:</strong>
+                            <p>${request.description}</p>
+                        </div>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            container.innerHTML = `
+                <div class="alert alert-error">
+                    Ошибка загрузки информации о заявке: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    async function loadResponses() {
+        const container = document.getElementById('responses-container');
+        
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <p>Пожалуйста, <a href="/login/">войдите в систему</a> для просмотра откликов.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/responses/request/${requestId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки откликов');
+            }
+            
+            const responses = await response.json();
+            
+            if (responses.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>На эту заявку пока нет откликов</h3>
+                        <p>Будьте первым, кто откликнется!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            renderResponses(responses, container);
+            
+        } catch (error) {
+            container.innerHTML = `
+                <div class="alert alert-error">
+                    Ошибка: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    function renderResponses(responses, container) {
+        container.innerHTML = '<div class="responses-list"></div>';
+        const list = container.querySelector('.responses-list');
+        
+        responses.forEach(response => {
+            const item = createResponseItem(response);
+            list.appendChild(item);
+        });
+    }
+    
+    function createResponseItem(response) {
+        const item = document.createElement('div');
+        item.className = 'response-item';
+        
+        const statusClass = `status-${response.status}`;
+        const statusText = {
+            'sent': 'Отправлен',
+            'accepted': 'Принят',
+            'rejected': 'Отклонен'
+        }[response.status] || response.status;
+        
+        const date = new Date(response.created_at).toLocaleDateString('ru-RU');
+        
+        // Проверяем, является ли текущий пользователь создателем заявки
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        const isRequestOwner = false; // TODO: Проверить через API
+        
+        item.innerHTML = `
+            <div class="response-header">
+                <div class="response-worker">
+                    <strong>👷 ${response.worker?.username || 'Неизвестно'}</strong>
+                </div>
+                <div class="response-status ${statusClass}">${statusText}</div>
+            </div>
+            
+            <div class="response-content">
+                <div class="response-meta">
+                    <span>📅 ${date}</span>
+                    ${response.proposed_price ? `<span>💰 ${response.proposed_price} ₽</span>` : ''}
+                </div>
+                
+                <div class="response-message">
+                    ${response.message}
+                </div>
+                
+                <div class="response-actions">
+                    ${isRequestOwner && response.status === 'sent' ? `
+                        <button onclick="openAcceptModal(${response.id})" class="btn btn-small btn-success">
+                            ✅ Принять
+                        </button>
+                    ` : ''}
+                    
+                    ${response.status === 'accepted' ? `
+                        <span class="badge-success">✅ Выбран исполнителем</span>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        return item;
+    }
+    
+    function openAcceptModal(responseId) {
+        currentResponseId = responseId;
+        document.getElementById('accept-modal').style.display = 'flex';
+    }
+    
+    function closeAcceptModal() {
+        document.getElementById('accept-modal').style.display = 'none';
+        currentResponseId = null;
+    }
+    
+    async function acceptResponse() {
+        if (!currentResponseId) return;
+        
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            showAlert('Пожалуйста, войдите в систему', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/responses/${currentResponseId}/accept`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showAlert('Отклик успешно принят!', 'success');
+                closeAcceptModal();
+                loadResponses(); // Обновляем список откликов
+                loadRequestInfo(); // Обновляем информацию о заявке
+            } else {
+                showAlert(data.message || 'Ошибка принятия отклика', 'error');
+            }
+        } catch (error) {
+            showAlert('Ошибка соединения: ' + error.message, 'error');
+        }
+    }
+    
+    // Закрытие модальных окон
+    window.onclick = function(event) {
+        const acceptModal = document.getElementById('accept-modal');
+        if (event.target === acceptModal) {
+            closeAcceptModal();
+        }
+    }
+</script>
+{% endblock %}

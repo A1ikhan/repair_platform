@@ -17,7 +17,7 @@
                     {% if user.is_authenticated %}
                         <span>Привет, {{ user.username }}!</span>
                         <a href="{% url 'profile' %}" class="btn btn-small">👤 Профиль</a>
-
+                        <a href="{% url 'logout' %}" class="btn btn-small btn-danger">🚪 Выход</a>
                     {% else %}
                         <a href="{% url 'login' %}" class="btn btn-small">🔑 Вход</a>
                         <a href="{% url 'register' %}" class="btn btn-small">📝 Регистрация</a>
@@ -33,14 +33,19 @@
                         </a></li>
 
                         {% if user.is_authenticated %}
-                        <li><a href="{% url 'repairs_list' %}" class="{% if 'repairs' in request.path and not 'my' in request.path %}active{% endif %}">
+                        <li><a href="{% url 'repairs_list' %}" class="{% if 'repairs' in request.path and not 'my' in request.path and not 'create' in request.path %}active{% endif %}">
                             <span>📋</span> Все заявки
                         </a></li>
-                        <li><a href="{% url 'my_repairs' %}" class="{% if 'my' in request.path %}active{% endif %}">
+                        <li><a href="{% url 'my_repairs' %}" class="{% if 'repairs/my' in request.path %}active{% endif %}">
                             <span>👤</span> Мои заявки
                         </a></li>
-                        <li><a href="{% url 'create_repair' %}" class="{% if 'create' in request.path %}active{% endif %}">
+                        <li><a href="{% url 'create_repair' %}" class="{% if 'repairs/create' in request.path %}active{% endif %}">
                             <span>➕</span> Создать заявку
+                        </a></li>
+
+                        <!-- Новые ссылки для откликов -->
+                        <li><a href="{% url 'my_responses' %}" class="{% if 'responses/my' in request.path %}active{% endif %}">
+                            <span>✉️</span> Мои отклики
                         </a></li>
                         {% endif %}
 
@@ -79,8 +84,59 @@
         </div>
     </div>
 
+    <!-- Модальное окно для откликов -->
+    <div id="response-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="response-modal-title">Отклик на заявку</h3>
+                <button class="modal-close" onclick="closeResponseModal()">&times;</button>
+            </div>
+            <div id="response-modal-content"></div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для принятия отклика -->
+    <div id="accept-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Принять отклик</h3>
+                <button class="modal-close" onclick="closeAcceptModal()">&times;</button>
+            </div>
+            <div id="accept-modal-content">
+                <p>Вы уверены, что хотите принять этот отклик?</p>
+                <p><strong>Внимание:</strong> Все остальные отклики на эту заявку будут автоматически отклонены.</p>
+                
+                <div class="modal-actions">
+                    <button onclick="acceptResponse()" class="btn btn-success">Да, принять</button>
+                    <button onclick="closeAcceptModal()" class="btn btn-secondary">Отмена</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const API_BASE_URL = '/api';
+         const API_BASE_URL = '/api';
+
+        // Передаем JWT токены из Django сессии в JavaScript
+        {% if user.is_authenticated and request.session.access_token %}
+            // Если есть JWT в сессии Django, сохраняем в localStorage
+            localStorage.setItem('access_token', '{{ request.session.access_token }}');
+            localStorage.setItem('refresh_token', '{{ request.session.refresh_token }}');
+
+            // Сохраняем данные пользователя
+            localStorage.setItem('user', JSON.stringify({
+                username: '{{ user.username }}',
+                email: '{{ user.email }}',
+                first_name: '{{ user.first_name }}',
+                last_name: '{{ user.last_name }}',
+                id: {{ user.id }},
+                is_authenticated: true
+            }));
+        {% endif %}
+
+        // Глобальные переменные и функции
+        let currentRequestId = null;
+        let currentResponseId = null;
 
         // Общие функции
         function showAlert(message, type = 'success') {
@@ -96,6 +152,115 @@
                 alert.style.display = 'none';
             }, 5000);
         }
+        // Получение токена авторизации
+        function getAuthToken() {
+            // Пробуем получить из localStorage
+            let token = localStorage.getItem('access_token');
+
+            // Если нет в localStorage, проверяем Django сессию
+            if (!token && typeof window.djangoAccessToken !== 'undefined') {
+                token = window.djangoAccessToken;
+            }
+
+            return token;
+        }
+
+        // Проверка авторизации
+        function isAuthenticated() {
+            const token = getAuthToken();
+            const userData = JSON.parse(localStorage.getItem('user') || '{}');
+
+            return !!(token || userData.is_authenticated);
+        }
+
+        // Функция для API запросов с авторизацией
+        async function apiRequest(url, options = {}) {
+            const token = getAuthToken();
+
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                ...options
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${url}`, defaultOptions);
+
+                // Если токен просрочен, пробуем обновить
+                if (response.status === 401) {
+                    const refreshed = await refreshToken();
+                    if (refreshed) {
+                        // Повторяем запрос с новым токеном
+                        defaultOptions.headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`;
+                        return await fetch(`${API_BASE_URL}${url}`, defaultOptions);
+                    }
+                }
+
+                return response;
+            } catch (error) {
+                console.error('API request error:', error);
+                throw error;
+            }
+        }
+
+        // Обновление токена
+        async function refreshToken() {
+            const refreshToken = localStorage.getItem('refresh_token');
+            if (!refreshToken) return false;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ refresh_token: refreshToken })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    localStorage.setItem('access_token', data.access);
+                    localStorage.setItem('refresh_token', data.refresh);
+                    return true;
+                }
+            } catch (error) {
+                console.error('Token refresh error:', error);
+            }
+
+            return false;
+        }
+
+        // Функция выхода
+        async function logout() {
+            const token = getAuthToken();
+
+            // 1. Выход из Django
+            try {
+                await fetch('/logout/', { method: 'GET' });
+            } catch (error) {
+                console.log('Django logout failed:', error);
+            }
+
+            // 2. Выход из JWT (если есть токен)
+            if (token) {
+                try {
+                    await apiRequest('/auth/logout', {
+                        method: 'POST'
+                    });
+                } catch (error) {
+                    console.log('JWT logout failed:', error);
+                }
+            }
+
+            // 3. Очищаем фронтенд данные
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            localStorage.removeItem('user');
+
+            // 4. Перезагружаем страницу
+            window.location.href = '/';
+        }
+
 
         function openRequestModal(content, title = 'Детали заявки') {
             document.getElementById('modal-title').textContent = title;
@@ -107,13 +272,233 @@
             document.getElementById('request-modal').style.display = 'none';
         }
 
-        // Закрытие модалки по клику вне ее
+        // Функции для модального окна откликов
+        function openResponseModal(content, title = 'Отклик на заявку') {
+            document.getElementById('response-modal-title').textContent = title;
+            document.getElementById('response-modal-content').innerHTML = content;
+            document.getElementById('response-modal').style.display = 'flex';
+        }
+
+        function closeResponseModal() {
+            document.getElementById('response-modal').style.display = 'none';
+            currentRequestId = null;
+        }
+
+        // Функции для модального окна принятия отклика
+        function openAcceptModal(responseId) {
+            currentResponseId = responseId;
+            document.getElementById('accept-modal').style.display = 'flex';
+        }
+
+        function closeAcceptModal() {
+            document.getElementById('accept-modal').style.display = 'none';
+            currentResponseId = null;
+        }
+
+        async function acceptResponse() {
+            if (!currentResponseId) return;
+            
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                showAlert('Пожалуйста, войдите в систему', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/responses/${currentResponseId}/accept`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Отклик успешно принят!', 'success');
+                    closeAcceptModal();
+                    // Если мы на странице откликов заявки, перезагрузим страницу
+                    if (window.location.pathname.includes('/responses/request/')) {
+                        window.location.reload();
+                    }
+                } else {
+                    showAlert(data.message || 'Ошибка принятия отклика', 'error');
+                }
+            } catch (error) {
+                showAlert('Ошибка соединения: ' + error.message, 'error');
+            }
+        }
+
+        // Функция для создания отклика
+        function openCreateResponseModal(requestId) {
+            currentRequestId = requestId;
+            
+            const content = `
+                <form id="create-response-form">
+                    <div class="form-group">
+                        <label for="response-message">Сообщение *</label>
+                        <textarea id="response-message" rows="4" required placeholder="Напишите ваше предложение по ремонту..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="response-price">Предложенная цена (₽)</label>
+                        <input type="number" id="response-price" step="0.01" min="0" placeholder="Например: 2500.50">
+                        <small class="text-muted">Укажите вашу цену за ремонт (необязательно)</small>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-success">Отправить отклик</button>
+                        <button type="button" onclick="closeResponseModal()" class="btn btn-secondary">Отмена</button>
+                    </div>
+                </form>
+            `;
+            
+            openResponseModal(content, 'Отклик на заявку');
+            
+            // Добавляем обработчик формы
+            const form = document.getElementById('create-response-form');
+            if (form) {
+                form.addEventListener('submit', submitResponseForm);
+            }
+        }
+        async function logout() {
+    // 1. Выход из Django (отправляем запрос на /logout/)
+    try {
+        const response = await fetch('/logout/', {
+            method: 'GET',
+            credentials: 'same-origin'  // Важно для отправки сессионных куки
+        });
+
+        // 2. Очищаем фронтенд данные
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+
+        // 3. Показываем сообщение
+        showAlert('Вы успешно вышли из системы', 'success');
+
+        // 4. Перенаправляем на главную страницу после небольшой задержки
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 1000);
+
+    } catch (error) {
+        // Если ошибка при запросе к Django, все равно очищаем фронтенд
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+
+        showAlert('Вы вышли из системы', 'info');
+
+        setTimeout(() => {
+            window.location.href = '/';
+        }, 1000);
+    }
+}
+
+// Также можно добавить обработчик для кнопки выхода, если она есть на странице
+document.addEventListener('DOMContentLoaded', function() {
+    const logoutBtn = document.querySelector('a[href*="logout"]');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            logout();
+        });
+    }
+});
+        
+        async function submitResponseForm(e) {
+            e.preventDefault();
+            
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                showAlert('Пожалуйста, войдите в систему', 'error');
+                return;
+            }
+            
+            const message = document.getElementById('response-message').value;
+            const price = document.getElementById('response-price').value;
+            
+            const responseData = {
+                message: message,
+                proposed_price: price ? parseFloat(price) : null
+            };
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Отправка...';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/responses/request/${currentRequestId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(responseData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showAlert('Отклик успешно отправлен!', 'success');
+                    closeResponseModal();
+                    // Если мы на странице "Мои отклики", обновим ее
+                    if (window.location.pathname === '/responses/my/') {
+                        window.location.reload();
+                    }
+                } else {
+                    showAlert(data.message || 'Ошибка отправки отклика', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Отправить отклик';
+                }
+            } catch (error) {
+                showAlert('Ошибка соединения: ' + error.message, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Отправить отклик';
+            }
+        }
+
+        // Функция для просмотра откликов на заявку
+        function viewRequestResponses(requestId) {
+            window.location.href = `/responses/request/${requestId}/`;
+        }
+
+        // Вспомогательная функция для получения токена
+        function getAuthToken() {
+            return localStorage.getItem('access_token');
+        }
+
+        // Закрытие модальных окон по клику вне их
         window.onclick = function(event) {
             const modal = document.getElementById('request-modal');
             if (event.target === modal) {
                 closeModal();
             }
+            
+            const responseModal = document.getElementById('response-modal');
+            if (event.target === responseModal) {
+                closeResponseModal();
+            }
+            
+            const acceptModal = document.getElementById('accept-modal');
+            if (event.target === acceptModal) {
+                closeAcceptModal();
+            }
         }
+
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Вешаем обработчик на кнопку выхода
+            const logoutBtn = document.querySelector('a[href*="logout"]');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    logout();
+                });
+            }
+        });
     </script>
 
     {% block extra_js %}{% endblock %}

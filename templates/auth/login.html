@@ -7,23 +7,41 @@
     <div class="auth-card">
         <h2>🔑 Вход в систему</h2>
         
-        <form id="login-form">
+        <form method="POST" action="{% url 'login' %}">
+            {% csrf_token %}
+
             <div class="form-group">
                 <label for="username">Логин</label>
                 <input type="text" id="username" name="username" required>
             </div>
-            
+
             <div class="form-group">
                 <label for="password">Пароль</label>
                 <input type="password" id="password" name="password" required>
             </div>
-            
+
             <button type="submit" class="btn btn-block">Войти</button>
         </form>
-        
+
         <div class="auth-links">
             <p>Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a></p>
             <p><a href="{% url 'index' %}">← Вернуться на главную</a></p>
+        </div>
+
+        <!-- Альтернативный вход через JavaScript (старый способ) -->
+        <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+            <p style="text-align: center; color: #666;">Или войдите через API:</p>
+            <form id="api-login-form">
+                <div class="form-group">
+                    <label for="api-username">Логин (API)</label>
+                    <input type="text" id="api-username" required>
+                </div>
+                <div class="form-group">
+                    <label for="api-password">Пароль (API)</label>
+                    <input type="password" id="api-password" required>
+                </div>
+                <button type="submit" class="btn btn-block btn-secondary">Войти через API</button>
+            </form>
         </div>
     </div>
 </div>
@@ -31,47 +49,50 @@
 
 {% block extra_js %}
 <script>
-    document.getElementById('login-form').addEventListener('submit', async function(e) {
+    // Старый способ входа через API (оставляем для совместимости)
+    document.getElementById('api-login-form').addEventListener('submit', async function(e) {
         e.preventDefault();
-        
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        
+
+        const username = document.getElementById('api-username').value;
+        const password = document.getElementById('api-password').value;
+
         const submitBtn = this.querySelector('button[type="submit"]');
         submitBtn.disabled = true;
         submitBtn.textContent = 'Вход...';
-        
+
         try {
             const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ username, password })
             });
-            
+
             const data = await response.json();
-            
+
             if (response.ok) {
                 // Сохраняем токены
                 localStorage.setItem('access_token', data.access);
                 localStorage.setItem('refresh_token', data.refresh);
+
+                // Сохраняем данные пользователя
                 localStorage.setItem('user', JSON.stringify(data.user || {username}));
-                
-                showAlert('Успешный вход!', 'success');
-                
+
+                showAlert('Успешный вход через API!', 'success');
+
                 // Перезагружаем страницу для обновления меню
                 setTimeout(() => {
-                    window.location.href = '/';
+                    window.location.reload();
                 }, 1000);
-                
+
             } else {
                 showAlert(data.message || 'Ошибка входа', 'error');
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Войти';
+                submitBtn.textContent = 'Войти через API';
             }
         } catch (error) {
             showAlert('Ошибка соединения', 'error');
             submitBtn.disabled = false;
-            submitBtn.textContent = 'Войти';
+            submitBtn.textContent = 'Войти через API';
         }
     });
 </script>

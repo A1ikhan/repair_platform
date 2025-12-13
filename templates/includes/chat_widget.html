@@ -1,0 +1,34 @@
+<div id="chat-widget" class="chat-widget">
+    <div class="chat-widget-header">
+        <span>💬 Чат</span>
+        <button class="chat-widget-close" onclick="closeChatWidget()">&times;</button>
+    </div>
+    <div id="chat-widget-messages" class="chat-widget-messages">
+        <!-- Сообщения будут загружены динамически -->
+    </div>
+    <div class="chat-widget-input">
+        <input type="text" id="chat-widget-input" placeholder="Введите сообщение..." style="width: 100%; padding: 8px;">
+    </div>
+</div>
+
+<button id="chat-toggle-button" class="chat-toggle-button" onclick="toggleChatWidget()">💬</button>
+
+<script>
+    let currentChatRequestId = null;
+
+    function toggleChatWidget() {
+        const widget = document.getElementById('chat-widget');
+        widget.classList.toggle('active');
+    }
+
+    function closeChatWidget() {
+        document.getElementById('chat-widget').classList.remove('active');
+    }
+
+    function openChatInWidget(requestId) {
+        currentChatRequestId = requestId;
+        document.getElementById('chat-widget').classList.add('active');
+        // Загрузить сообщения для этого чата
+        loadChatMessages(requestId);
+    }
+</script>

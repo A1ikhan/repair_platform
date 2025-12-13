@@ -1,0 +1,392 @@
+{% extends 'base.html' %}
+
+{% block title %}Мои отклики - Repair Platform{% endblock %}
+
+{% block content %}
+<div class="responses-container">
+    <h2>👷 Мои отклики</h2>
+    
+    <div id="responses-filters" class="filters">
+        <div class="filter-row">
+            <div class="filter-group">
+                <label>Статус</label>
+                <select id="status-filter">
+                    <option value="">Все статусы</option>
+                    <option value="sent">Отправлен</option>
+                    <option value="accepted">Принят</option>
+                    <option value="rejected">Отклонен</option>
+                </select>
+            </div>
+            <button onclick="loadMyResponses()" class="btn btn-secondary">Фильтровать</button>
+        </div>
+    </div>
+    
+    <div id="responses-list">
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Загрузка ваших откликов...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для создания отклика -->
+<div id="response-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modal-title">Отклик на заявку</h3>
+            <button class="modal-close" onclick="closeResponseModal()">&times;</button>
+        </div>
+        <div id="response-modal-content">
+            <!-- Форма будет загружена динамически -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentRequestId = null;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        loadMyResponses();
+    });
+    
+    async function loadMyResponses() {
+        const container = document.getElementById('responses-list');
+        const statusFilter = document.getElementById('status-filter').value;
+        
+        container.innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Загрузка ваших откликов...</p>
+            </div>
+        `;
+        
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <p>Пожалуйста, <a href="/login/">войдите в систему</a> для просмотра откликов.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        try {
+            let url = `${API_BASE_URL}/responses/my`;
+            if (statusFilter) {
+                url += `?status=${statusFilter}`;
+            }
+            
+            const response = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки откликов');
+            }
+            
+            const responses = await response.json();
+            
+            if (responses.length === 0) {
+                container.innerHTML = `
+                    <div class="no-data">
+                        <h3>У вас нет откликов</h3>
+                        <p>Посмотрите <a href="/repairs/">доступные заявки</a> и отправьте свой первый отклик!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            renderResponses(responses, container);
+            
+        } catch (error) {
+            container.innerHTML = `
+                <div class="alert alert-error">
+                    Ошибка: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    function renderResponses(responses, container) {
+        container.innerHTML = '<div class="responses-grid"></div>';
+        const grid = container.querySelector('.responses-grid');
+        
+        responses.forEach(response => {
+            const card = createResponseCard(response);
+            grid.appendChild(card);
+        });
+    }
+    
+    function createResponseCard(response) {
+        const card = document.createElement('div');
+        card.className = 'response-card';
+        
+        const statusClass = `status-${response.status}`;
+        const statusText = {
+            'sent': 'Отправлен',
+            'accepted': 'Принят',
+            'rejected': 'Отклонен'
+        }[response.status] || response.status;
+        
+        const date = new Date(response.created_at).toLocaleDateString('ru-RU');
+        
+        card.innerHTML = `
+            <div class="response-header">
+                <div class="response-status ${statusClass}">${statusText}</div>
+                <div class="response-date">📅 ${date}</div>
+            </div>
+            
+            <h4>К заявке: #${response.repair_request_id}</h4>
+            
+            <div class="response-message">
+                <strong>Сообщение:</strong>
+                <p>${response.message.substring(0, 150)}${response.message.length > 150 ? '...' : ''}</p>
+            </div>
+            
+            ${response.proposed_price ? `
+                <div class="response-price">
+                    <strong>Предложенная цена:</strong> ${response.proposed_price} ₽
+                </div>
+            ` : ''}
+            
+            <div class="response-actions">
+                <button onclick="viewResponseDetails(${response.id})" class="btn btn-small">👁️ Подробнее</button>
+                <button onclick="viewRequestDetails(${response.repair_request_id})" class="btn btn-small btn-secondary">📋 Заявка</button>
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    async function viewResponseDetails(responseId) {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/responses/${responseId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error('Ошибка загрузки отклика');
+            }
+            
+            const responseData = await response.json();
+            showResponseDetailsModal(responseData);
+            
+        } catch (error) {
+            showAlert('Ошибка загрузки деталей отклика', 'error');
+        }
+    }
+    
+    function showResponseDetailsModal(response) {
+        const statusText = {
+            'sent': 'Отправлен',
+            'accepted': 'Принят',
+            'rejected': 'Отклонен'
+        }[response.status] || response.status;
+        
+        const content = `
+            <div class="response-details">
+                <div class="detail-row">
+                    <span class="detail-label">Статус:</span>
+                    <span class="status-${response.status}">${statusText}</span>
+                </div>
+                
+                <div class="detail-row">
+                    <span class="detail-label">Дата создания:</span>
+                    <span>${new Date(response.created_at).toLocaleString('ru-RU')}</span>
+                </div>
+                
+                ${response.updated_at !== response.created_at ? `
+                <div class="detail-row">
+                    <span class="detail-label">Дата обновления:</span>
+                    <span>${new Date(response.updated_at).toLocaleString('ru-RU')}</span>
+                </div>
+                ` : ''}
+                
+                <div class="detail-row">
+                    <span class="detail-label">Сообщение:</span>
+                    <div class="message-content">${response.message}</div>
+                </div>
+                
+                ${response.proposed_price ? `
+                <div class="detail-row">
+                    <span class="detail-label">Предложенная цена:</span>
+                    <span class="price-value">${response.proposed_price} ₽</span>
+                </div>
+                ` : ''}
+                
+                <div class="detail-row">
+                    <span class="detail-label">Заявка:</span>
+                    <a href="#" onclick="viewRequestDetails(${response.repair_request_id}); return false;">
+                        Перейти к заявке #${response.repair_request_id}
+                    </a>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('modal-title').textContent = 'Детали отклика';
+        document.getElementById('response-modal-content').innerHTML = content;
+        document.getElementById('response-modal').style.display = 'flex';
+    }
+    
+    function closeResponseModal() {
+        document.getElementById('response-modal').style.display = 'none';
+    }
+    
+    async function viewRequestDetails(requestId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/repairs/${requestId}`);
+            const request = await response.json();
+            
+            if (response.ok) {
+                const deviceText = {
+                    'fridge': 'Холодильник',
+                    'washer': 'Стиральная машина',
+                    'oven': 'Духовка',
+                    'dishwasher': 'Посудомоечная машина',
+                    'other': 'Другое'
+                }[request.device_type] || request.device_type;
+                
+                const statusText = {
+                    'new': 'Новая',
+                    'active': 'В работе',
+                    'completed': 'Завершена',
+                    'cancelled': 'Отменена'
+                }[request.status] || request.status;
+                
+                const content = `
+                    <div style="margin-bottom: 20px;">
+                        <span class="status-${request.status}" style="margin-bottom: 10px; display: inline-block;">
+                            ${statusText}
+                        </span>
+                        <h4>${request.title}</h4>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <p><strong>Тип устройства:</strong> ${deviceText}</p>
+                        <p><strong>Создатель:</strong> ${request.created_by?.username || 'Неизвестно'}</p>
+                        <p><strong>Дата создания:</strong> ${new Date(request.created_at).toLocaleString('ru-RU')}</p>
+                    </div>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h5>Описание проблемы:</h5>
+                        <p>${request.description.substring(0, 200)}${request.description.length > 200 ? '...' : ''}</p>
+                    </div>
+                    
+                    ${request.predicted_price ? `
+                        <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <p><strong>Примерная стоимость:</strong> ${request.predicted_price} ₽</p>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="modal-actions">
+                        <button onclick="openCreateResponseModal(${requestId})" class="btn btn-success">
+                            ✉️ Откликнуться
+                        </button>
+                    </div>
+                `;
+                
+                openRequestModal(content, request.title);
+            }
+        } catch (error) {
+            showAlert('Ошибка загрузки данных заявки', 'error');
+        }
+    }
+    
+    function openCreateResponseModal(requestId) {
+        currentRequestId = requestId;
+        
+        const content = `
+            <form id="create-response-form">
+                <div class="form-group">
+                    <label for="response-message">Сообщение *</label>
+                    <textarea id="response-message" rows="4" required placeholder="Напишите ваше предложение по ремонту..."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="response-price">Предложенная цена (₽)</label>
+                    <input type="number" id="response-price" step="0.01" min="0" placeholder="Например: 2500.50">
+                    <small class="text-muted">Укажите вашу цену за ремонт (необязательно)</small>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-success">Отправить отклик</button>
+                    <button type="button" onclick="closeResponseModal()" class="btn btn-secondary">Отмена</button>
+                </div>
+            </form>
+        `;
+        
+        document.getElementById('modal-title').textContent = 'Отклик на заявку';
+        document.getElementById('response-modal-content').innerHTML = content;
+        document.getElementById('response-modal').style.display = 'flex';
+        
+        // Добавляем обработчик формы
+        document.getElementById('create-response-form').addEventListener('submit', submitResponseForm);
+    }
+    
+    async function submitResponseForm(e) {
+        e.preventDefault();
+        
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            showAlert('Пожалуйста, войдите в систему', 'error');
+            return;
+        }
+        
+        const message = document.getElementById('response-message').value;
+        const price = document.getElementById('response-price').value;
+        
+        const responseData = {
+            message: message,
+            proposed_price: price ? parseFloat(price) : null
+        };
+        
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Отправка...';
+        
+        try {
+            const response = await fetch(`${API_BASE_URL}/responses/request/${currentRequestId}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(responseData)
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showAlert('Отклик успешно отправлен!', 'success');
+                closeResponseModal();
+                loadMyResponses(); // Обновляем список откликов
+            } else {
+                showAlert(data.message || 'Ошибка отправки отклика', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Отправить отклик';
+            }
+        } catch (error) {
+            showAlert('Ошибка соединения: ' + error.message, 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Отправить отклик';
+        }
+    }
+    
+    // Закрытие модального окна по клику вне его
+    window.onclick = function(event) {
+        const modal = document.getElementById('response-modal');
+        if (event.target === modal) {
+            closeResponseModal();
+        }
+    }
+</script>
+{% endblock %}

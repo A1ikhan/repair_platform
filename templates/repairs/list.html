@@ -181,6 +181,10 @@
             
             <div class="request-actions">
                 <button onclick="viewRequestDetails(${request.id})" class="btn btn-small">👁️ Подробнее</button>
+                <button onclick="viewRequestResponses(${request.id})" class="btn btn-small btn-secondary">✉️ Отклики</button>
+                ${isMyRequest || request.status === 'active' ? `
+                <button onclick="openChat(${request.id})" class="btn btn-small btn-success">💬 Чат</button>
+                ` : ''}
                 ${isMyRequest ? `
                     <button onclick="editRequest(${request.id})" class="btn btn-small btn-secondary">✏️ Изменить</button>
                     <button onclick="deleteRequest(${request.id})" class="btn btn-small btn-danger">🗑️ Удалить</button>
@@ -190,7 +194,12 @@
         
         return card;
     }
-    
+    function viewRequestResponses(requestId) {
+    window.location.href = `/responses/request/${requestId}/`;
+}
+    function openChat(requestId) {
+    window.location.href = `/chat/request/${requestId}/`;
+}
     async function viewRequestDetails(requestId) {
         try {
             const response = await fetch(`${API_BASE_URL}/repairs/${requestId}`);
