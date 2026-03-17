@@ -1,8 +1,11 @@
+import logging
 from django.contrib.auth.models import User
 from ninja.errors import HttpError
 from django.db import models
 from back.models import RepairRequest, Review
 from back import models as api_models
+
+logger = logging.getLogger(__name__)
 
 
 class ReviewService:
@@ -32,6 +35,7 @@ class ReviewService:
                 review.comment = data.comment or ''
                 review.save()
 
+            logger.info("Customer %s created review for worker %s on request #%s", customer.id, accepted_response.worker_id, repair_request_id)
             ReviewService._update_worker_rating(accepted_response.worker)
             return review
 
@@ -66,7 +70,7 @@ class ReviewService:
             review.comment = data.comment or ''
             review.save()
 
-            # Обновляем рейтинг работника
+            logger.info("Customer %s updated review #%s", customer.id, review_id)
             ReviewService._update_worker_rating(review.worker)
 
             return review
@@ -82,7 +86,7 @@ class ReviewService:
             worker = review.worker  # сохраняем работника для обновления рейтинга
             review.delete()
 
-            # Обновляем рейтинг работника после удаления
+            logger.info("Customer %s deleted review #%s", customer.id, review_id)
             ReviewService._update_worker_rating(worker)
 
             return {"message": "Review deleted successfully"}

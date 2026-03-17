@@ -27,7 +27,7 @@ RUN python manage.py collectstatic --noinput
 RUN mkdir -p /app/staticfiles
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8080
 
 # Run application
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "core.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "core.wsgi:application"]

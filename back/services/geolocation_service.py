@@ -1,8 +1,11 @@
+import logging
 import os
 from typing import Optional, Dict, List
 
 import requests
 from ninja.errors import HttpError
+
+logger = logging.getLogger(__name__)
 
 
 class DGisService:
@@ -47,7 +50,7 @@ class DGisService:
             return None
 
         except requests.exceptions.RequestException as e:
-            print(f"2GIS Geocoding error: {e}")
+            logger.warning("2GIS Geocoding error: %s", e)
             return None
 
     def reverse_geocode(self, lat: float, lon: float) -> Optional[str]:
@@ -73,7 +76,7 @@ class DGisService:
             return None
 
         except requests.exceptions.RequestException as e:
-            print(f"2GIS Reverse Geocoding error: {e}")
+            logger.warning("2GIS Reverse Geocoding error: %s", e)
             return None
 
     def search_businesses(self, query: str, lat: float, lon: float, radius: int = 1000) -> List[Dict]:
@@ -111,7 +114,7 @@ class DGisService:
             return results
 
         except requests.exceptions.RequestException as e:
-            print(f"2GIS Business search error: {e}")
+            logger.warning("2GIS Business search error: %s", e)
             return []
 
     def calculate_distance_matrix(self, origins: List[tuple], destinations: List[tuple]) -> Optional[Dict]:

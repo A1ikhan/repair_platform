@@ -1,3 +1,4 @@
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 from imagekit.models import ImageSpecField
@@ -41,7 +42,7 @@ class RepairRequest(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    predicted_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    predicted_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
     price_confidence = models.FloatField(default=0.0)  # Уверенность предсказания 0-1
     ai_analysis_data = models.JSONField(default=dict, blank=True)  # Данные анализа ИИ
 
@@ -49,7 +50,25 @@ class RepairRequest(models.Model):
     problem_photos = models.ManyToManyField(ProblemPhoto, blank=True)
 
     # Финальная цена после ремонта
-    final_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    final_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)])
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['device_type']),
+            models.Index(fields=['created_by', 'created_at']),
+            models.Index(fields=['status', 'device_type']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(predicted_price__gte=0) | models.Q(predicted_price__isnull=True),
+                name='repairrequest_predicted_price_non_negative',
+            ),
+            models.CheckConstraint(
+                check=models.Q(final_price__gte=0) | models.Q(final_price__isnull=True),
+                name='repairrequest_final_price_non_negative',
+            ),
+        ]
 
     def __str__(self):
         return self.title

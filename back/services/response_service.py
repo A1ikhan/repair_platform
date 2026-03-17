@@ -1,3 +1,5 @@
+import logging
+from django.db import transaction
 from ninja.errors import HttpError
 from back.models import RepairRequest, Response
 from .bookmark_service import BookmarkService
@@ -5,6 +7,8 @@ from .notification_service import NotificationService
 from back import models
 
 from .userlist_service import AutoListService
+
+logger = logging.getLogger(__name__)
 
 
 class ResponseService:
@@ -23,6 +27,7 @@ class ResponseService:
                 status='sent'
             )
 
+            logger.info("Worker %s submitted response #%s to request #%s", worker.id, response.id, repair_request_id)
             NotificationService.notify_new_response(repair_request, response)
             AutoListService.handle_response_created(response)
             return response
@@ -73,19 +78,20 @@ class ResponseService:
     @staticmethod
     def accept_response(response_id: int, customer):
         try:
-            response = models.Response.objects.get(id=response_id)
+            response = models.Response.objects.select_related('repair_request').get(id=response_id)
             if response.repair_request.created_by != customer:
                 raise HttpError(403, "Only the request owner can accept responses")
 
-            response.status = 'accepted'
-            response.save()
-            response.repair_request.status = 'active'
-            response.repair_request.save()
+            with transaction.atomic():
+                response.status = 'accepted'
+                response.save()
+                response.repair_request.status = 'active'
+                response.repair_request.save()
+                models.Response.objects.filter(
+                    repair_request=response.repair_request
+                ).exclude(id=response_id).update(status='rejected')
 
-            models.Response.objects.filter(
-                repair_request=response.repair_request
-            ).exclude(id=response_id).update(status='rejected')
-
+            logger.info("Customer %s accepted response #%s for request #%s", customer.id, response_id, response.repair_request_id)
             NotificationService.notify_response_accepted(response)
             AutoListService.handle_response_accepted(response)
             return response

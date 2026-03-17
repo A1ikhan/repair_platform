@@ -2,38 +2,27 @@
 from ninja import Router
 from ninja.errors import HttpError
 
-from back.models import UserList, ListItem
 from back.schemas import RepairRequestSchemaOut
 from back.schemas import UserListSchemaOut, ListItemSchemaOut, ListItemSchemaIn
 from back.services import RepairRequestService
 from back.services import UserListService
 
 router = Router(tags=["UserList"])
-@router.get("/lists", response=list[UserListSchemaOut], auth=None)
+
+
+@router.get("/lists", response=list[UserListSchemaOut])
 def get_my_lists(request):
     """Get all user lists"""
     return UserListService.get_user_lists(request.user)
 
 
-def get_list_items(user, list_name: str):
-    """Получить элементы конкретного списка пользователя"""
-    # Создаём стандартные списки, если их ещё нет
-    UserListService.get_or_create_user_lists(user)
+@router.get("/lists/{list_name}/items", response=list[ListItemSchemaOut])
+def get_list_items(request, list_name: str):
+    """Get items of a specific user list"""
+    return UserListService.get_list_items(request.user, list_name)
 
-    try:
-        user_list = UserList.objects.get(user=user, name=list_name)
-    except UserList.DoesNotExist:
-        raise HttpError(404, f"List '{list_name}' not found")
 
-    # Загружаем элементы списка с заявками и пользователями
-    queryset = ListItem.objects.filter(
-        user_list=user_list
-    ).select_related('repair_request', 'repair_request__created_by')
-
-    # Преобразуем ORM-объекты в схемы (Pydantic модели)
-    return [ListItemSchemaOut.from_orm(item) for item in queryset]
-
-@router.post("/lists/{list_name}/items", response=ListItemSchemaOut, auth=None)
+@router.post("/lists/{list_name}/items", response=ListItemSchemaOut)
 def add_to_list(request, list_name: str, data: ListItemSchemaIn):
     """Add repair request to list"""
     return UserListService.add_to_list(
@@ -43,19 +32,22 @@ def add_to_list(request, list_name: str, data: ListItemSchemaIn):
         data.notes
     )
 
-@router.delete("/lists/{list_name}/items/{repair_request_id}", response=dict, auth=None)
+
+@router.delete("/lists/{list_name}/items/{repair_request_id}", response=dict)
 def remove_from_list(request, list_name: str, repair_request_id: int):
     """Remove repair request from list"""
     return UserListService.remove_from_list(request.user, list_name, repair_request_id)
 
-@router.put("/lists/{list_name}/items/{repair_request_id}/notes", response=ListItemSchemaOut, auth=None)
+
+@router.put("/lists/{list_name}/items/{repair_request_id}/notes", response=ListItemSchemaOut)
 def update_item_notes(request, list_name: str, repair_request_id: int, notes: str):
     """Update notes for list item"""
     return UserListService.update_list_item_notes(
         request.user, list_name, repair_request_id, notes
     )
 
-@router.get("/lists/check/{repair_request_id}", response=dict, auth=None)
+
+@router.get("/lists/check/{repair_request_id}", response=dict)
 def check_in_list(request, repair_request_id: int, list_name: str = None):
     """Check if repair request is in user's list(s)"""
     is_in_list = UserListService.is_in_list(request.user, repair_request_id, list_name)
@@ -65,38 +57,43 @@ def check_in_list(request, repair_request_id: int, list_name: str = None):
         "list_name": list_name
     }
 
-@router.post("/lists/move", response=ListItemSchemaOut, auth=None)
+
+@router.post("/lists/move", response=ListItemSchemaOut)
 def move_between_lists(
     request,
     repair_request_id: int,
     from_list: str,
-    to_list: str
+    to_list: str,
 ):
     """Move item between lists"""
     return UserListService.move_between_lists(
         request.user, repair_request_id, from_list, to_list
     )
 
+
 # Специальные эндпоинты для частых операций
-@router.get("/favorites", response=list[ListItemSchemaOut], auth=None)
+@router.get("/favorites", response=list[ListItemSchemaOut])
 def get_favorites(request):
     """Get user's favorite repair requests"""
     return UserListService.get_user_favorites(request.user)
 
-@router.post("/favorites/{repair_request_id}", response=ListItemSchemaOut, auth=None)
+
+@router.post("/favorites/{repair_request_id}", response=ListItemSchemaOut)
 def add_to_favorites(request, repair_request_id: int, notes: str = None):
     """Add repair request to favorites"""
     return UserListService.add_to_list(
         request.user, 'favorite', repair_request_id, notes
     )
 
-@router.delete("/favorites/{repair_request_id}", response=dict, auth=None)
+
+@router.delete("/favorites/{repair_request_id}", response=dict)
 def remove_from_favorites(request, repair_request_id: int):
     """Remove repair request from favorites"""
     return UserListService.remove_from_list(request.user, 'favorite', repair_request_id)
 
+
 # Эндпоинт для завершения заявок
-@router.post("/repairs/{request_id}/complete", response=RepairRequestSchemaOut, auth=None)
+@router.post("/repairs/{request_id}/complete", response=RepairRequestSchemaOut)
 def complete_repair_request(request, request_id: int):
     """Mark repair request as completed"""
     return RepairRequestService.complete_request(request_id, request.user)

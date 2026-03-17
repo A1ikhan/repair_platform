@@ -13,6 +13,15 @@ class Review(models.Model):
 
     class Meta:
         unique_together = ['repair_request', 'customer']
+        indexes = [
+            models.Index(fields=['worker', 'created_at']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(rating__gte=1) & models.Q(rating__lte=5),
+                name='review_rating_1_to_5',
+            ),
+        ]
 
     def __str__(self):
         return f"Review for {self.worker.username} - {self.rating} stars"

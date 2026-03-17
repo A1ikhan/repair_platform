@@ -1,6 +1,10 @@
+import logging
+from django.db import transaction
 from back.models import RepairRequest, Response
 from back.models.userlist_model import UserList, ListItem
 from ninja.errors import HttpError
+
+logger = logging.getLogger(__name__)
 
 class UserListService:
     @staticmethod
@@ -19,8 +23,8 @@ class UserListService:
 
     @staticmethod
     def get_user_lists(user):
-        UserListService.get_or_create_user_lists(user)
         """Получить все списки пользователя"""
+        UserListService.get_or_create_user_lists(user)
         return UserList.objects.filter(user=user).prefetch_related('items')
 
     @staticmethod
@@ -70,8 +74,8 @@ class UserListService:
 
     @staticmethod
     def get_list_items(user, list_name: str):
-        UserListService.get_or_create_user_lists(user)
         """Получить элементы списка с пагинацией"""
+        UserListService.get_or_create_user_lists(user)
         user_list = UserListService.get_list_by_name(user, list_name)
         queryset = ListItem.objects.filter(
             user_list=user_list
@@ -125,10 +129,9 @@ class UserListService:
     def move_between_lists(user, repair_request_id: int, from_list: str, to_list: str):
         """Переместить заявку между списками"""
         try:
-            # Удаляем из исходного списка
-            UserListService.remove_from_list(user, from_list, repair_request_id)
-            # Добавляем в целевой список
-            return UserListService.add_to_list(user, to_list, repair_request_id)
+            with transaction.atomic():
+                UserListService.remove_from_list(user, from_list, repair_request_id)
+                return UserListService.add_to_list(user, to_list, repair_request_id)
 
         except HttpError as e:
             if "Item not found" in str(e):
@@ -150,7 +153,7 @@ class AutoListService:
                 notes='Автоматически добавлено при отклике'
             )
         except HttpError:
-            pass  # Уже в списке - игнорируем
+            pass  # Already in list — expected, ignore
 
     @staticmethod
     def handle_response_accepted(response):
@@ -162,8 +165,8 @@ class AutoListService:
                 'watching',
                 'applied'
             )
-        except HttpError:
-            pass
+        except HttpError as e:
+            logger.warning("AutoList: could not move request #%s to 'applied': %s", response.repair_request.id, e)
 
     @staticmethod
     def handle_request_completed(repair_request):
@@ -179,5 +182,7 @@ class AutoListService:
                 'applied',
                 'completed'
             )
-        except (Response.DoesNotExist, HttpError):
-            pass
+        except Response.DoesNotExist:
+            pass  # No accepted worker — nothing to move
+        except HttpError as e:
+            logger.warning("AutoList: could not move request #%s to 'completed': %s", repair_request.id, e)

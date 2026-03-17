@@ -150,8 +150,16 @@ class RepairRequestService:
         return RepairRequest.objects.filter(created_by=user).select_related('created_by').prefetch_related('files',
                                                                                                            'problem_photos')
 
+    _MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
     @staticmethod
     def create_request(data, user, files: list = None, file_descriptions: list = None, is_public: bool = True):
+        # Validate uploaded files before creating the request
+        if files:
+            for file in files:
+                if file.size > RepairRequestService._MAX_FILE_SIZE:
+                    raise HttpError(400, f"File '{file.name}' exceeds the 10 MB size limit")
+
         # Создаем саму заявку
         repair_request = RepairRequest.objects.create(
             **data.dict(),

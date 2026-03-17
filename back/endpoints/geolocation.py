@@ -1,4 +1,5 @@
 from ninja import Router
+from ninja.errors import HttpError
 from typing import List, Optional
 from back.schemas import (
     LocationSchema, LocationUpdateSchema, NearbyWorkersResponse,
@@ -54,7 +55,7 @@ def add_service_area(request, worker_id: int, city: str, radius_km: int = 10):
 
     worker = User.objects.get(id=worker_id)
     if worker != request.user and not request.user.is_staff:
-        return 403, {"message": "Permission denied"}
+        raise HttpError(403, "Permission denied")
 
     ServiceArea.objects.create(
         worker=worker,

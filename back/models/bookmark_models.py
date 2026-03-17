@@ -1,3 +1,4 @@
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.contrib.auth.models import User
 from back.models.response_models import Response
@@ -49,7 +50,7 @@ class Bookmark(models.Model):
 
     # Персональные заметки
     notes = models.TextField(blank=True)
-    personal_rating = models.PositiveSmallIntegerField(null=True, blank=True)  # 1-5 звезд
+    personal_rating = models.PositiveSmallIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(5)])  # 1-5 звезд
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -61,6 +62,15 @@ class Bookmark(models.Model):
             models.Index(fields=['user', 'priority']),
             models.Index(fields=['user', 'planned_date']),
             models.Index(fields=['user', 'status']),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(personal_rating__gte=1) & models.Q(personal_rating__lte=5)
+                    | models.Q(personal_rating__isnull=True)
+                ),
+                name='bookmark_personal_rating_1_to_5',
+            ),
         ]
 
     def __str__(self):

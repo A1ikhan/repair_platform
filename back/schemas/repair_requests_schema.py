@@ -1,7 +1,11 @@
+import re
 from ninja import Schema
+from pydantic import Field, field_validator
 from typing import Optional, List
 from datetime import date, datetime
 from .users_schema import UserSchema
+
+_VALID_DEVICE_TYPES = {'fridge', 'washer', 'oven', 'dishwasher', 'other'}
 
 class ProblemPhotoSchema(Schema):
     id: int
@@ -24,11 +28,18 @@ class PricePredictionSchema(Schema):
 
 
 class RepairRequestSchemaIn(Schema):
-    title: str
-    description: str
+    title: str = Field(max_length=200)
+    description: str = Field(max_length=5000)
     device_type: str
-    address: str
+    address: str = Field(max_length=500)
     desired_completion_date: Optional[date] = None
+
+    @field_validator('device_type')
+    @classmethod
+    def validate_device_type(cls, v: str) -> str:
+        if v not in _VALID_DEVICE_TYPES:
+            raise ValueError(f"device_type must be one of: {', '.join(sorted(_VALID_DEVICE_TYPES))}")
+        return v
 
 class FileSchemaOut(Schema):
     id: int

@@ -1,35 +1,51 @@
 # docker-compose.yml
 
-
 services:
   web:
     build: .
     command: >
-      sh -c "gunicorn --bind 0.0.0.0:8000 core.wsgi:application"
+      sh -c "python manage.py migrate && gunicorn --bind 0.0.0.0:8080 core.wsgi:application"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
     env_file:
       - .env
     ports:
-      - "8000:8000"
-#    environment:
-#      - DB_HOST=db
-#    depends_on:
-#      - db
+      - "8080:8080"
+    environment:
+      - DB_HOST=db
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-#  db:
-#    image: postgres:15
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data/
-#      - ./docker/dump.sql:/docker-entrypoint-initdb.d/dump.sql
-#    env_file:
-#      - .env
-#    environment:
-#        - POSTGRES_DB=${DB_NAME}
-#        - POSTGRES_USER=${DB_USER}
-#        - POSTGRES_PASSWORD=${DB_PASSWORD}
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
-#  postgres_data:
+  postgres_data:
   static_volume:
+  redis_data:

@@ -1,4 +1,5 @@
 from ninja import NinjaAPI
+from ninja.throttling import AnonRateThrottle, AuthRateThrottle
 from back.dependencies import AuthBearer
 
 # Импортируем саброутеры
@@ -13,6 +14,10 @@ api = NinjaAPI(
     auth=AuthBearer(),
     csrf=True,
     docs_url="/docs",
+    throttle=[
+        AnonRateThrottle("100/hour"),
+        AuthRateThrottle("1000/hour"),
+    ],
 )
 
 # Подключаем роутеры

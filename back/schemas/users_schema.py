@@ -1,7 +1,11 @@
+import re
 from datetime import datetime
 from typing import Optional, List
 
 from ninja import Schema
+from pydantic import field_validator
+
+_PHONE_RE = re.compile(r'^\+?[\d\s\-\(\)]{7,20}$')
 
 
 class Message(Schema):
@@ -10,7 +14,7 @@ class Message(Schema):
 class UserSchema(Schema):
     id: int
     username: str
-    email: str
+    email: str|None=None
     first_name: str
     last_name: str
     user_type: str
@@ -31,10 +35,24 @@ class UserCreate(Schema):
     last_name: Optional[str] = None
     user_type: str
 
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        return v
+
+    @field_validator('user_type')
+    @classmethod
+    def validate_user_type(cls, v: str) -> str:
+        if v not in {'customer', 'worker'}:
+            raise ValueError("user_type must be 'customer' or 'worker'")
+        return v
+
 class CustomerProfileSchema(Schema):
     phone_number: str
     address: str
-    avatar_url: Optional[str]
+    avatar_url: str | None=None
     bio: str
     show_my_requests: bool
     show_my_responses: bool
@@ -55,6 +73,13 @@ class CustomerProfileUpdate(Schema):
     show_my_requests: Optional[bool] = None
     show_my_responses: Optional[bool] = None
     show_my_reviews: Optional[bool] = None
+
+    @field_validator('phone_number')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not _PHONE_RE.match(v):
+            raise ValueError('Invalid phone number format (7–20 digits, +, spaces, dashes, parentheses allowed)')
+        return v
 
 class WorkerProfileSchema(Schema):
     phone_number: str
@@ -84,6 +109,13 @@ class WorkerProfileUpdate(Schema):
     show_my_responses: Optional[bool] = None
     show_my_reviews: Optional[bool] = None
     show_my_rating: Optional[bool] = None
+
+    @field_validator('phone_number')
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not _PHONE_RE.match(v):
+            raise ValueError('Invalid phone number format (7–20 digits, +, spaces, dashes, parentheses allowed)')
+        return v
 
 class UserDetailSchema(Schema):
     user: UserSchema

@@ -111,8 +111,16 @@ class UserProfileService:
         user.save()
         return {"message": "Password changed successfully"}
 
+    _MAX_AVATAR_SIZE = 5 * 1024 * 1024  # 5 MB
+    _ALLOWED_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
+
     @staticmethod
     def upload_avatar(user, avatar_file):
+        if avatar_file.size > UserProfileService._MAX_AVATAR_SIZE:
+            raise HttpError(400, "Avatar exceeds the 5 MB size limit")
+        if getattr(avatar_file, 'content_type', None) not in UserProfileService._ALLOWED_IMAGE_TYPES:
+            raise HttpError(400, "Avatar must be a JPEG, PNG, WebP, or GIF image")
+
         if hasattr(user, 'customer_profile'):
             profile = user.customer_profile
         elif hasattr(user, 'worker_profile'):

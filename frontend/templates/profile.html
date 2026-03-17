@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Мой профиль{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="profile-header">
+        <div class="profile-avatar">
+            <div class="avatar-large">
+                {{ user.username|first|upper }}
+            </div>
+            <div class="profile-info">
+                <h1>{{ user.username }}</h1>
+                <p class="profile-email">{{ user.email }}</p>
+                <div class="profile-stats">
+                    <div class="stat">
+                        <strong>{{ user_requests_count }}</strong>
+                        <span>Заявок</span>
+                    </div>
+                    <div class="stat">
+                        <strong>{{ user_responses_count }}</strong>
+                        <span>Откликов</span>
+                    </div>
+                    <div class="stat">
+                        <strong>{{ user_rating }}</strong>
+                        <span>Рейтинг</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="profile-actions">
+            <button class="btn btn-outline" onclick="editProfile()">
+                <i class="fas fa-edit"></i> Редактировать
+            </button>
+        </div>
+    </div>
+
+    <div class="profile-tabs">
+        <div class="tabs">
+            <button class="tab active" onclick="openTab('my-requests')">
+                <i class="fas fa-list"></i> Мои заявки
+            </button>
+            <button class="tab" onclick="openTab('my-responses')">
+                <i class="fas fa-comments"></i> Мои отклики
+            </button>
+            <button class="tab" onclick="openTab('settings')">
+                <i class="fas fa-cog"></i> Настройки
+            </button>
+        </div>
+
+        <div class="tab-content">
+            <!-- Мои заявки -->
+            <div id="my-requests" class="tab-pane active">
+                <div class="requests-list" id="user-requests-list">
+                    <!-- Загружается через JS -->
+                </div>
+            </div>
+
+            <!-- Мои отклики -->
+            <div id="my-responses" class="tab-pane">
+                <div class="responses-list" id="user-responses-list">
+                    <!-- Загружается через JS -->
+                </div>
+            </div>
+
+            <!-- Настройки -->
+            <div id="settings" class="tab-pane">
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label>Email уведомления</label>
+                        <select class="form-control">
+                            <option>Все уведомления</option>
+                            <option>Только важные</option>
+                            <option>Не получать</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Телефон</label>
+                        <input type="tel" class="form-control" placeholder="+7 (777) 123-45-67">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -13,6 +13,10 @@ class ChatMessage(models.Model):
 
     class Meta:
         ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['repair_request', 'created_at']),
+            models.Index(fields=['repair_request', 'is_read']),
+        ]
 
     def __str__(self):
         return f"Message from {self.sender.username} for request #{self.repair_request.id}"

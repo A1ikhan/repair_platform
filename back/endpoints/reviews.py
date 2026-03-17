@@ -1,4 +1,5 @@
 from ninja import Router
+from ninja.pagination import paginate, PageNumberPagination
 from back.schemas import ReviewSchemaOut, ReviewSchemaIn
 from back.services import ReviewService
 from ..dependencies import customer_required
@@ -10,8 +11,9 @@ def create_review(request, repair_request_id: int, data: ReviewSchemaIn):
     customer = customer_required(request)
     return ReviewService.create_review(repair_request_id, data, customer)
 
-@router.get("/worker/{worker_id}", response=list[ReviewSchemaOut])
-def get_worker_reviews(request, worker_id: int):
+@router.get("/worker/{worker_id}", response=list[ReviewSchemaOut], auth=None)
+@paginate(PageNumberPagination)
+def get_worker_reviews(request, worker_id: int, **kwargs):
     return ReviewService.get_worker_reviews(worker_id)
 
 @router.get("/my", response=list[ReviewSchemaOut])

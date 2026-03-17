@@ -1,0 +1,492 @@
+{% extends 'base.html' %}
+
+{% block title %}Заявки на ремонт{% endblock %}
+
+{% block extra_css %}
+<style>
+.filters-sidebar {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px;
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+}
+
+.filters-group {
+    margin-bottom: 20px;
+}
+
+.filters-group h4 {
+    margin-bottom: 10px;
+    color: var(--dark);
+}
+
+.filter-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.filter-tag {
+    padding: 6px 12px;
+    background: var(--light-gray);
+    border-radius: 20px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.filter-tag:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.filter-tag.active {
+    background: var(--primary);
+    color: white;
+}
+
+.request-card-large {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+}
+
+.request-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.request-meta {
+    display: flex;
+    gap: 15px;
+    color: var(--gray);
+    font-size: 14px;
+}
+
+.request-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.price-estimate {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: var(--radius);
+    margin-top: 15px;
+}
+
+.price-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.confidence-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    background: #e3f2fd;
+    color: #1976d2;
+    margin-left: 10px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Заявки на ремонт</h1>
+        <a href="/requests/create/" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Новая заявка
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Фильтры -->
+        <div class="col-md-3">
+            <div class="filters-sidebar">
+                <h3>Фильтры</h3>
+                
+                <div class="filters-group">
+                    <h4>Тип устройства</h4>
+                    <div class="filter-tags" id="device-filter">
+                        <!-- Загружается через JS -->
+                    </div>
+                </div>
+                
+                <div class="filters-group">
+                    <h4>Статус</h4>
+                    <div class="filter-tags" id="status-filter">
+                        <!-- Загружается через JS -->
+                    </div>
+                </div>
+                
+                <div class="filters-group">
+                    <h4>Сортировка</h4>
+                    <select id="sort-select" class="form-control">
+                        <option value="newest">Сначала новые</option>
+                        <option value="oldest">Сначала старые</option>
+                        <option value="price_low">Цена: по возрастанию</option>
+                        <option value="price_high">Цена: по убыванию</option>
+                    </select>
+                </div>
+                
+                <button id="apply-filters" class="btn btn-primary btn-block mt-3">
+                    Применить фильтры
+                </button>
+            </div>
+        </div>
+
+        <!-- Список заявок -->
+        <div class="col-md-9">
+            <!-- Поиск -->
+            <div class="search-box mb-4">
+                <div class="input-group">
+                    <input type="text" id="search-input" class="form-control" placeholder="Поиск по заявкам...">
+                    <button id="search-btn" class="btn btn-primary">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Результаты -->
+            <div id="requests-list">
+                <!-- Загружается через JS -->
+            </div>
+
+            <!-- Пагинация -->
+            <nav id="pagination" class="mt-4">
+                <!-- Загружается через JS -->
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', async function() {
+    let currentFilters = {
+        device_type: null,
+        status: null,
+        search: null,
+        sort: 'newest'
+    };
+    let currentPage = 1;
+    let totalPages = 1;
+
+    // Загружаем фильтры
+    await loadFilters();
+    // Загружаем заявки
+    await loadRequests();
+
+    // Обработчики событий
+    document.getElementById('apply-filters').addEventListener('click', applyFilters);
+    document.getElementById('search-btn').addEventListener('click', searchRequests);
+    document.getElementById('search-input').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') searchRequests();
+    });
+    document.getElementById('sort-select').addEventListener('change', function() {
+        currentFilters.sort = this.value;
+        loadRequests();
+    });
+
+    async function loadFilters() {
+        try {
+            const filters = await api.request('/repairs/filters');
+            
+            // Фильтр по типу устройства
+            const deviceFilter = document.getElementById('device-filter');
+            deviceFilter.innerHTML = filters.device_types.map(type => `
+                <div class="filter-tag ${currentFilters.device_type === type ? 'active' : ''}" 
+                     data-type="${type}"
+                     onclick="toggleFilter('device_type', '${type}')">
+                    ${getDeviceText(type)}
+                </div>
+            `).join('');
+            
+            // Фильтр по статусу
+            const statusFilter = document.getElementById('status-filter');
+            statusFilter.innerHTML = filters.statuses.map(status => `
+                <div class="filter-tag ${currentFilters.status === status ? 'active' : ''}" 
+                     data-type="${status}"
+                     onclick="toggleFilter('status', '${status}')">
+                    ${getStatusText(status)}
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading filters:', error);
+        }
+    }
+
+    function toggleFilter(filterType, value) {
+        if (currentFilters[filterType] === value) {
+            currentFilters[filterType] = null;
+        } else {
+            currentFilters[filterType] = value;
+        }
+        // Обновляем активный класс
+        document.querySelectorAll(`[data-type="${value}"]`).forEach(tag => {
+            tag.classList.toggle('active');
+        });
+        loadRequests();
+    }
+
+    function applyFilters() {
+        currentPage = 1;
+        loadRequests();
+    }
+
+    function searchRequests() {
+        currentFilters.search = document.getElementById('search-input').value.trim();
+        currentPage = 1;
+        loadRequests();
+    }
+
+    async function loadRequests() {
+        try {
+            const params = new URLSearchParams();
+            
+            if (currentFilters.device_type) params.append('device_type', currentFilters.device_type);
+            if (currentFilters.status) params.append('status', currentFilters.status);
+            if (currentFilters.search) params.append('search', currentFilters.search);
+            
+            params.append('page', currentPage);
+            
+            // Сортировка
+            switch(currentFilters.sort) {
+                case 'newest':
+                    params.append('ordering', '-created_at');
+                    break;
+                case 'oldest':
+                    params.append('ordering', 'created_at');
+                    break;
+                case 'price_low':
+                    params.append('ordering', 'predicted_price');
+                    break;
+                case 'price_high':
+                    params.append('ordering', '-predicted_price');
+                    break;
+            }
+
+            const response = await api.request(`/repairs/?${params.toString()}`);
+            renderRequests(response);
+            
+        } catch (error) {
+            console.error('Error loading requests:', error);
+            document.getElementById('requests-list').innerHTML = `
+                <div class="alert alert-error">
+                    Ошибка загрузки заявок: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    function renderRequests(requests) {
+        const container = document.getElementById('requests-list');
+        
+        if (!requests || requests.length === 0) {
+            container.innerHTML = `
+                <div class="no-results">
+                    <i class="fas fa-search fa-3x"></i>
+                    <h3>Заявки не найдены</h3>
+                    <p>Попробуйте изменить параметры поиска</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = requests.map(request => `
+            <div class="request-card-large">
+                <div class="request-header">
+                    <div>
+                        <h3 class="request-title">
+                            <a href="/requests/${request.id}/">${request.title}</a>
+                        </h3>
+                        <div class="request-meta">
+                            <span class="request-device">
+                                <i class="fas fa-${getDeviceIcon(request.device_type)}"></i>
+                                ${getDeviceText(request.device_type)}
+                            </span>
+                            <span class="request-date">
+                                <i class="far fa-clock"></i>
+                                ${new Date(request.created_at).toLocaleDateString('ru-RU')}
+                            </span>
+                            <span class="request-author">
+                                <i class="fas fa-user"></i>
+                                ${request.created_by.username}
+                            </span>
+                        </div>
+                    </div>
+                    <span class="request-status status-${request.status}">
+                        ${getStatusText(request.status)}
+                    </span>
+                </div>
+                
+                <p class="request-description">${request.description}</p>
+                
+                ${request.predicted_price ? `
+                <div class="price-estimate">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted">Предварительная оценка:</span>
+                            <span class="price-value ml-2">
+                                ${utils.formatPrice(request.predicted_price)}
+                            </span>
+                            <span class="confidence-badge">
+                                ${Math.round(request.price_confidence * 100)}% уверенность
+                            </span>
+                        </div>
+                        <span class="text-muted">На основе анализа ИИ</span>
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="request-footer mt-3">
+                    <div class="request-actions">
+                        <a href="/requests/${request.id}/" class="btn btn-sm">
+                            <i class="fas fa-eye"></i> Подробнее
+                        </a>
+                        ${request.status === 'new' ? `
+                        <button onclick="openResponseForm(${request.id})" class="btn btn-primary btn-sm">
+                            <i class="fas fa-reply"></i> Откликнуться
+                        </button>
+                        ` : ''}
+                    </div>
+                    ${request.responses && request.responses.length > 0 ? `
+                    <span class="responses-count">
+                        <i class="fas fa-comments"></i>
+                        ${request.responses.length} откликов
+                    </span>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+        
+        renderPagination();
+    }
+
+    function renderPagination() {
+        const pagination = document.getElementById('pagination');
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+        
+        let html = '<ul class="pagination">';
+        
+        // Кнопка "Назад"
+        html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage - 1})">&laquo;</a>
+        </li>`;
+        
+        // Страницы
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage || i === currentPage - 1 || i === currentPage + 1) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                </li>`;
+            } else if (i === 1 || i === totalPages) {
+                html += `<li class="page-item">
+                    <a class="page-link" href="#" onclick="changePage(${i})">${i}</a>
+                </li>`;
+            } else if (i === currentPage - 2 || i === currentPage + 2) {
+                html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+            }
+        }
+        
+        // Кнопка "Вперед"
+        html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="changePage(${currentPage + 1})">&raquo;</a>
+        </li>`;
+        
+        html += '</ul>';
+        pagination.innerHTML = html;
+    }
+
+    window.changePage = function(page) {
+        if (page < 1 || page > totalPages || page === currentPage) return;
+        currentPage = page;
+        loadRequests();
+    };
+
+    window.openResponseForm = function(requestId) {
+        if (!authToken) {
+            utils.showNotification('Войдите в систему, чтобы откликнуться', 'warning');
+            window.location.href = '/login/';
+            return;
+        }
+        
+        // Покажем модальное окно с формой отклика
+        const modalHtml = `
+            <div class="modal-overlay" id="response-modal">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Отклик на заявку</h3>
+                        <button class="modal-close" onclick="closeModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="response-form">
+                            <div class="form-group">
+                                <label>Сообщение мастеру</label>
+                                <textarea id="response-message" class="form-control" rows="4" required 
+                                          placeholder="Опишите ваш опыт, предложение по ремонту..."></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Предлагаемая цена (тенге)</label>
+                                <input type="number" id="proposed-price" class="form-control" 
+                                       placeholder="Укажите примерную стоимость ремонта">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button onclick="closeModal()" class="btn btn-secondary">Отмена</button>
+                        <button onclick="submitResponse(${requestId})" class="btn btn-primary">Отправить отклик</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    };
+
+    window.closeModal = function() {
+        const modal = document.getElementById('response-modal');
+        if (modal) modal.remove();
+    };
+
+    window.submitResponse = async function(requestId) {
+        try {
+            const message = document.getElementById('response-message').value;
+            const price = document.getElementById('proposed-price').value;
+            
+            if (!message.trim()) {
+                utils.showNotification('Введите сообщение', 'error');
+                return;
+            }
+            
+            const response = await api.request(`/responses/request/${requestId}`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    message: message,
+                    proposed_price: price ? parseFloat(price) : null
+                })
+            });
+            
+            utils.showNotification('Отклик успешно отправлен!', 'success');
+            closeModal();
+            loadRequests(); // Обновляем список
+            
+        } catch (error) {
+            utils.showNotification(`Ошибка: ${error.message}`, 'error');
+        }
+    };
+});
+</script>
+{% endblock %}
