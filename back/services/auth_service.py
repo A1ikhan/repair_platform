@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 from ninja_jwt.tokens import RefreshToken, AccessToken
 from ninja.errors import HttpError
 from back.models import CustomerProfile, WorkerProfile
-from back.schemas import UserSchema
 from back.services.user_service import ActivityService
 
 
@@ -44,8 +43,23 @@ class AuthService:
         return user
 
     @staticmethod
-    def login_user(username: str, password: str, request=None):
-        user = authenticate(username=username, password=password)
+    def login_user(username: str, password: str, request=None, email: str = None):
+        user = None
+        if username:
+            if '@' in username:
+                try:
+                    db_user = User.objects.get(email=username)
+                    user = authenticate(username=db_user.username, password=password)
+                except User.DoesNotExist:
+                    pass
+            else:
+                user = authenticate(username=username, password=password)
+        if not user and email:
+            try:
+                db_user = User.objects.get(email=email)
+                user = authenticate(username=db_user.username, password=password)
+            except User.DoesNotExist:
+                pass
         if not user:
             raise HttpError(401, "Invalid credentials")
 
@@ -61,10 +75,17 @@ class AuthService:
         refresh = RefreshToken.for_user(user)
         access = AccessToken.for_user(user)
 
+        if hasattr(user, 'customer_profile'):
+            user_type = 'customer'
+        elif hasattr(user, 'worker_profile'):
+            user_type = 'worker'
+        else:
+            user_type = 'unknown'
+
         return {
             "access": str(access),
             "refresh": str(refresh),
-            "user": UserSchema.model_validate(user)
+            "user_type": user_type,
         }
 
     @staticmethod

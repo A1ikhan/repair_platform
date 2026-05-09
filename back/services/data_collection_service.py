@@ -106,9 +106,16 @@ class SimplePriceEstimator:
     BASE_PRICES = {
         'fridge': 30000,
         'washer': 25000,
+        'dryer': 23000,
         'oven': 20000,
+        'microwave': 12000,
         'dishwasher': 22000,
-        'other': 15000
+        'tv': 28000,
+        'ac': 35000,
+        'water_heater': 26000,
+        'vacuum': 10000,
+        'coffee_machine': 18000,
+        'other': 15000,
     }
 
     @staticmethod

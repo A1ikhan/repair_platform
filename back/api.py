@@ -12,7 +12,7 @@ api = NinjaAPI(
     version="1.0.0",
     description="API for appliance repair service platform",
     auth=AuthBearer(),
-    csrf=True,
+    csrf=False,
     docs_url="/docs",
     throttle=[
         AnonRateThrottle("100/hour"),

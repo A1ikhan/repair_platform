@@ -25,8 +25,15 @@ class RepairRequest(models.Model):
     DEVICE_TYPES = [
         ('fridge', 'Refrigerator'),
         ('washer', 'Washing Machine'),
+        ('dryer', 'Dryer'),
         ('oven', 'Oven'),
+        ('microwave', 'Microwave'),
         ('dishwasher', 'Dishwasher'),
+        ('tv', 'Television'),
+        ('ac', 'Air Conditioner'),
+        ('water_heater', 'Water Heater'),
+        ('vacuum', 'Vacuum Cleaner'),
+        ('coffee_machine', 'Coffee Machine'),
         ('other', 'Other'),
     ]
 

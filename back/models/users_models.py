@@ -62,6 +62,19 @@ class WorkerProfile(models.Model):
         return 'worker'
 
 
+class SavedWorker(models.Model):
+    customer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_workers')
+    worker = models.ForeignKey(User, on_delete=models.CASCADE, related_name='saved_by_customers')
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['customer', 'worker']
+        ordering = ['-saved_at']
+
+    def __str__(self):
+        return f"{self.customer.username} saved {self.worker.username}"
+
+
 class UserActivity(models.Model):
     """Модель для истории действий пользователя"""
 

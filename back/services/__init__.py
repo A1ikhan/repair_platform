@@ -7,3 +7,4 @@ from .notification_service import NotificationService
 from .chat_service import ChatService
 from .userlist_service import UserListService
 from .pagination_service import PaginationService
+from .worker_service import WorkerService

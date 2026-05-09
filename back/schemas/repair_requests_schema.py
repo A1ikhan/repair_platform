@@ -5,7 +5,11 @@ from typing import Optional, List
 from datetime import date, datetime
 from .users_schema import UserSchema
 
-_VALID_DEVICE_TYPES = {'fridge', 'washer', 'oven', 'dishwasher', 'other'}
+_VALID_DEVICE_TYPES = {
+    'fridge', 'washer', 'dryer', 'oven', 'microwave',
+    'dishwasher', 'tv', 'ac', 'water_heater', 'vacuum',
+    'coffee_machine', 'other',
+}
 
 class ProblemPhotoSchema(Schema):
     id: int

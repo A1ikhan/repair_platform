@@ -16,4 +16,4 @@ from .geolocation_schema import (LocationSchema,LocationUpdateSchema,NearbyWorke
 
 from .bookmark_schema import (BookmarkFolderSchema, BookmarkFolderCreate, BookmarkFolderUpdate,
     BookmarkSchema, BookmarkCreate, BookmarkUpdate,
-    BookmarkStatsSchema, BookmarkFilterSchema)
+    BookmarkStatsSchema, BookmarkFilterSchema, EnrichedResponseSchemaOut)

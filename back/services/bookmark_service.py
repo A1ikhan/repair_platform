@@ -4,7 +4,7 @@ from ninja.errors import HttpError
 from typing import List, Dict, Optional
 from back.models.bookmark_models import Bookmark, BookmarkFolder, BookmarkHistory
 from back.models.response_models import Response
-from back.schemas.bookmark_schema import BookmarkSchema, ResponseSchemaOut
+from back.schemas.bookmark_schema import BookmarkSchema
 
 
 class BookmarkService:
@@ -301,26 +301,19 @@ class BookmarkService:
         response_ids = [response.id for response in responses]
 
         # Получаем все закладки пользователя для этих откликов
-        bookmarks = Bookmark.objects.filter(
-            user=user,
-            response_id__in=response_ids
-        ).select_related('folder').in_bulk(field_name='response_id')
+        bookmarks = {
+            b.response_id: b
+            for b in Bookmark.objects.filter(
+                user=user,
+                response_id__in=response_ids
+            ).select_related('folder')
+        }
 
-        enriched_responses = []
         for response in responses:
-            response_data = ResponseSchemaOut.from_orm(response)
             bookmark = bookmarks.get(response.id)
+            response._bookmark = bookmark
 
-            if bookmark:
-                response_data.is_bookmarked = True
-                response_data.bookmark_info = BookmarkSchema.from_orm(bookmark)
-            else:
-                response_data.is_bookmarked = False
-                response_data.bookmark_info = None
-
-            enriched_responses.append(response_data)
-
-        return enriched_responses
+        return list(responses)
 
 
 class BookmarkNotificationService:

@@ -232,6 +232,8 @@ class ActivityService:
 
 def track_activity(activity_type: str, description: str = ""):
     def decorator(func):
+        import functools
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             result = func(*args, **kwargs)
 

@@ -2,7 +2,9 @@ from django.views.decorators.csrf import csrf_exempt
 from ninja import Router
 from back.schemas import Message, UserCreate, LoginInput, TokenOutput
 from back.services.auth_service import AuthService
+import logging
 
+logger = logging.getLogger(__name__)
 router = Router(tags=["Auth"])
 
 @router.post("/register", response={200: Message, 400: Message}, auth=None)
@@ -16,7 +18,7 @@ def register(request, data: UserCreate):
 @csrf_exempt
 def login(request, data: LoginInput):
     """Login user with activity tracking"""
-    response = AuthService.login_user(data.username, data.password, request)
+    response = AuthService.login_user(data.username, data.password, request, email=data.email)
 
     # Для фронтенда можно добавить CORS headers
     response["Access-Control-Allow-Origin"] = "http://localhost:8000"

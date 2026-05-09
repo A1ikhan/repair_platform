@@ -107,8 +107,7 @@ class BookmarkFilterSchema(Schema):
     has_reminder: Optional[bool] = None
     is_overdue: Optional[bool] = None
 
-# Обновляем схему Response чтобы включить информацию о закладках
-class ResponseSchemaOut(Schema):
+class EnrichedResponseSchemaOut(Schema):
     id: int
     message: str
     proposed_price: Optional[float]
@@ -129,10 +128,11 @@ class ResponseSchemaOut(Schema):
 
     @staticmethod
     def resolve_is_bookmarked(obj):
-        # Этот метод будет реализован в сервисе
-        return False
+        return getattr(obj, '_bookmark', None) is not None
 
     @staticmethod
     def resolve_bookmark_info(obj):
-        # Этот метод будет реализован в сервисе
+        bookmark = getattr(obj, '_bookmark', None)
+        if bookmark:
+            return BookmarkSchema.from_orm(bookmark)
         return None

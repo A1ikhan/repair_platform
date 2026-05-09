@@ -1,5 +1,5 @@
 from ninja import Router
-from back.schemas import ResponseSchemaIn, ResponseSchemaOut
+from back.schemas import ResponseSchemaIn, ResponseSchemaOut, EnrichedResponseSchemaOut
 from back.services import ResponseService
 from ..dependencies import worker_required, customer_required
 
@@ -14,7 +14,7 @@ def create_response(request, repair_request_id: int, data: ResponseSchemaIn):
 def get_responses_for_request(request, repair_request_id: int):
     return ResponseService.get_responses_for_request(repair_request_id, request.user)
 
-@router.get("/my", response=list[ResponseSchemaOut])
+@router.get("/my", response=list[EnrichedResponseSchemaOut])
 def get_my_responses(request):
     worker = worker_required(request)
     return ResponseService.get_worker_responses(worker)

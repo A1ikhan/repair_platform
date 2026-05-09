@@ -87,7 +87,7 @@ class WorkerProfileSchema(Schema):
     experience: int
     rating: float
     is_verified: bool
-    avatar_url: Optional[str]
+    avatar_url: Optional[str] = None
     bio: str
     show_my_responses: bool
     show_my_reviews: bool
@@ -121,6 +121,10 @@ class UserDetailSchema(Schema):
     user: UserSchema
     customer_profile: Optional[CustomerProfileSchema] = None
     worker_profile: Optional[WorkerProfileSchema] = None
+
+    @staticmethod
+    def resolve_user(obj):
+        return obj
 
     @staticmethod
     def resolve_customer_profile(obj):
