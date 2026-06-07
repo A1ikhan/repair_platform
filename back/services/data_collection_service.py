@@ -1,8 +1,7 @@
 from django.db import models
-from ninja.errors import HttpError
 import re
 from typing import List, Dict
-from back.models.repair_models import RepairRequest, PriceHistory, ProblemPhoto
+from back.models.repair_models import RepairRequest, PriceHistory
 
 
 class DataCollectionService:
@@ -31,6 +30,10 @@ class DataCollectionService:
             price_history = PriceHistory.objects.get(repair_request=repair_request)
             price_history.final_price = final_price
             price_history.save()
+
+            # Сбрасываем RAG-индекс для этого типа устройства
+            from back.services.rag_price_service import RAGPriceService
+            RAGPriceService.invalidate(repair_request.device_type)
 
             return True
 

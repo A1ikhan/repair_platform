@@ -120,23 +120,8 @@ class SimplePriceEstimator:
 
     @staticmethod
     def estimate_price(device_type: str, description: str) -> Dict:
-        """Простая оценка цены на основе правил"""
-        base_price = SimplePriceEstimator.BASE_PRICES.get(device_type, 1500)
-
-        complexity_analysis = DataCollectionService.analyze_problem_complexity(description, device_type)
-        complexity_multiplier = 1.0 + (complexity_analysis['complexity_score'] * 0.1)
-        estimated_price = base_price * complexity_multiplier
-
-        return {
-            'predicted_price': round(estimated_price, 2),
-            'confidence': 0.3,
-            'price_range': {
-                'min': round(estimated_price * 0.5, 2),
-                'max': round(estimated_price * 1.5, 2)
-            },
-            'complexity_analysis': complexity_analysis,
-            'message': 'Примерная оценка на основе типа устройства и сложности проблемы'
-        }
+        from back.services.price_estimation_service import PriceEstimationService
+        return PriceEstimationService.estimate(device_type, description)
 
 
 class RepairRequestService:

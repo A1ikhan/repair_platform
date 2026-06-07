@@ -13,11 +13,34 @@ logger = logging.getLogger(__name__)
 
 class ResponseService:
     @staticmethod
+    def _validate_proposed_price(repair_request: RepairRequest, proposed_price):
+        """Отклоняет цену если она выходит за AI-диапазон заявки."""
+        if proposed_price is None:
+            return
+        ai_data = repair_request.ai_analysis_data or {}
+        price_range = ai_data.get('price_range')
+        if not price_range:
+            return
+        min_price = price_range.get('min')
+        max_price = price_range.get('max')
+        if min_price is None or max_price is None:
+            return
+        price = float(proposed_price)
+        if price < min_price or price > max_price:
+            raise HttpError(
+                400,
+                f"Предложенная цена {price:,.0f} ₸ выходит за допустимый диапазон "
+                f"{min_price:,.0f} – {max_price:,.0f} ₸"
+            )
+
+    @staticmethod
     def create_response(repair_request_id: int, data, worker):
         try:
             repair_request = RepairRequest.objects.get(id=repair_request_id)
             if models.Response.objects.filter(repair_request=repair_request, worker=worker).exists():
                 raise HttpError(400, "You have already responded to this request")
+
+            ResponseService._validate_proposed_price(repair_request, data.proposed_price)
 
             response = models.Response.objects.create(
                 repair_request=repair_request,

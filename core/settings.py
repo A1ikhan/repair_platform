@@ -16,6 +16,22 @@ from dotenv import load_dotenv
 from django.core.exceptions import ImproperlyConfigured
 
 load_dotenv()
+
+# prometheus_client must see this env var before any metric is created
+_prom_dir = os.getenv('PROMETHEUS_MULTIPROC_DIR')
+if _prom_dir:
+    os.makedirs(_prom_dir, exist_ok=True)
+
+import sentry_sdk
+
+_sentry_dsn = os.getenv('SENTRY_DSN')
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        environment='development' if os.getenv('DEBUG', 'False') == 'True' else 'production',
+        traces_sample_rate=0.2,
+        send_default_pii=False,
+    )
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_URL = '/media/'
@@ -42,6 +58,8 @@ else:
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'django_prometheus',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -57,6 +75,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'django_prometheus.middleware.PrometheusBeforeMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -66,6 +85,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_prometheus.middleware.PrometheusAfterMiddleware',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -104,6 +124,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'core.wsgi.application'
+ASGI_APPLICATION = 'core.asgi.application'
 
 
 # Database
@@ -113,7 +134,7 @@ _db_name = os.getenv('DB_NAME')
 if _db_name:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.postgresql',
+            'ENGINE': 'django_prometheus.db.backends.postgresql',
             'NAME': _db_name,
             'USER': os.getenv('DB_USER', 'postgres'),
             'PASSWORD': os.getenv('DB_PASSWORD', ''),
@@ -124,7 +145,7 @@ if _db_name:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
+            'ENGINE': 'django_prometheus.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
@@ -187,6 +208,15 @@ else:
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         }
     }
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [os.getenv('REDIS_URL', 'redis://localhost:6379')],
+        },
+    }
+}
 
 LOGGING = {
     'version': 1,

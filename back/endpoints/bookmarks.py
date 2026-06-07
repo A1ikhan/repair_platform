@@ -45,7 +45,7 @@ def delete_bookmark_folder(request, folder_id: int):
 def create_bookmark(request, data: BookmarkCreate):
     """Создать закладку на отклик"""
     worker = worker_required(request)
-    return BookmarkService.create_bookmark(worker, data.repair_request_id, data.dict(exclude_unset=True))
+    return BookmarkService.create_bookmark(worker, data.response_id, data.dict(exclude_unset=True))
 
 
 @router.get("/bookmarks", response=List[BookmarkSchema])
@@ -88,6 +88,13 @@ def get_upcoming_bookmarks(request, days: int = 7):
     return BookmarkService.get_upcoming_bookmarks(worker, days)
 
 
+@router.get("/bookmarks/stats", response=BookmarkStatsSchema)
+def get_bookmark_stats(request):
+    """Получить статистику по закладкам"""
+    worker = worker_required(request)
+    return BookmarkService.get_bookmark_stats(worker)
+
+
 @router.put("/bookmarks/{bookmark_id}", response=BookmarkSchema)
 def update_bookmark(request, bookmark_id: int, data: BookmarkUpdate):
     """Обновить закладку"""
@@ -100,10 +107,3 @@ def delete_bookmark(request, bookmark_id: int):
     """Удалить закладку"""
     worker = worker_required(request)
     return BookmarkService.delete_bookmark(worker, bookmark_id)
-
-
-@router.get("/bookmarks/stats", response=BookmarkStatsSchema)
-def get_bookmark_stats(request):
-    """Получить статистику по закладкам"""
-    worker = worker_required(request)
-    return BookmarkService.get_bookmark_stats(worker)

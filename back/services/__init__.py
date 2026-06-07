@@ -8,3 +8,4 @@ from .chat_service import ChatService
 from .userlist_service import UserListService
 from .pagination_service import PaginationService
 from .worker_service import WorkerService
+from .worker_scoring_service import WorkerScoringService

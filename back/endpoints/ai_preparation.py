@@ -1,11 +1,12 @@
 from ninja import Router, File, UploadedFile
-from typing import List
+from typing import List, Optional
 from back.schemas import (
     Message, ProblemPhotoSchema, ProblemPhotoUploadSchema,
     PricePredictionSchema, FinalPriceUpdateSchema, RepairRequestSchemaOut
 )
 from back.services.repair_request_service import (RepairRequestService, SimplePriceEstimator,
                                                   DataCollectionService)
+from back.services.price_estimation_service import PriceEstimationService
 
 router = Router(tags=["AI Preparation"])
 
@@ -36,8 +37,30 @@ def update_final_price(request, repair_request_id: int, data: FinalPriceUpdateSc
 
 @router.post("/estimate-price", response=PricePredictionSchema, auth=None)
 def estimate_repair_price(request, device_type: str, description: str):
-    """Предварительная оценка цены ремонта"""
-    return SimplePriceEstimator.estimate_price(device_type, description)
+    """Оценка цены по описанию (ключевые слова + правила)"""
+    return PriceEstimationService.estimate(device_type, description)
+
+
+@router.post("/estimate-price-with-photo", response=PricePredictionSchema, auth=None)
+def estimate_repair_price_with_photo(
+    request,
+    device_type: str,
+    description: str,
+    file: Optional[UploadedFile] = File(None),
+):
+    """
+    Оценка цены по описанию + фото.
+    Фото анализируется через Claude Vision API (если задан ANTHROPIC_API_KEY).
+    Без API-ключа работает как обычная оценка по ключевым словам.
+    """
+    image_bytes = None
+    media_type = "image/jpeg"
+
+    if file:
+        image_bytes = file.read()
+        media_type = file.content_type or "image/jpeg"
+
+    return PriceEstimationService.estimate(device_type, description, image_bytes, media_type)
 
 @router.get("/data-stats", response=dict, auth=None)
 def get_data_collection_stats(request):

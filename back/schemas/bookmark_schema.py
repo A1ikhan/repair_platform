@@ -1,5 +1,5 @@
 from ninja import Schema
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, date
 
 from back.schemas import ResponseSchemaOut, UserSchema, RepairRequestSchemaOut
@@ -71,13 +71,13 @@ class BookmarkSchema(Schema):
         return obj.has_reminder
 
 class BookmarkCreate(Schema):
-    repair_request_id: int
+    response_id: int
     folder_id: Optional[int] = None
     priority: Optional[str] = 'medium'
     planned_date: Optional[date] = None
     reminder_date: Optional[datetime] = None
     deadline: Optional[date] = None
-    notes: Optional[str] = None
+    notes: str = ''
     personal_rating: Optional[int] = None
 
 class BookmarkUpdate(Schema):

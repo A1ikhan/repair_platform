@@ -24,8 +24,13 @@ def get_my_location(request):
 
 
 @router.get("/workers/nearby", response=List[NearbyWorkersResponse])
-def get_nearby_workers(request, address: str, max_distance: int = 10):
-    """Найти работников поблизости"""
+def get_nearby_workers(
+    request,
+    address: str,
+    max_distance: int = 10,
+    device_type: Optional[str] = None,
+):
+    """Найти работников поблизости, отсортированных по скор-баллу."""
     from back.services.geolocation_service import DGisService
 
     dgis = DGisService()
@@ -37,7 +42,8 @@ def get_nearby_workers(request, address: str, max_distance: int = 10):
     return LocationService.find_nearby_workers(
         geocode_result['latitude'],
         geocode_result['longitude'],
-        max_distance
+        max_distance,
+        device_type=device_type,
     )
 
 

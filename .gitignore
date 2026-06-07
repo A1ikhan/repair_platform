@@ -31,3 +31,4 @@ Thumbs.db
 migrations/*.py
 !migrations/__init__.py
 
+.claude/

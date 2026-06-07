@@ -1,10 +1,8 @@
 from django.db import models
 from django.utils import timezone
 from ninja.errors import HttpError
-from typing import List, Dict, Optional
 from back.models.bookmark_models import Bookmark, BookmarkFolder, BookmarkHistory
 from back.models.response_models import Response
-from back.schemas.bookmark_schema import BookmarkSchema
 
 
 class BookmarkService:
@@ -85,7 +83,7 @@ class BookmarkService:
                 'planned_date': data.get('planned_date'),
                 'reminder_date': data.get('reminder_date'),
                 'deadline': data.get('deadline'),
-                'notes': data.get('notes', ''),
+                'notes': data.get('notes') or '',
                 'personal_rating': data.get('personal_rating'),
             }
 

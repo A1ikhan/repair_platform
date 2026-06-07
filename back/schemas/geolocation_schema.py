@@ -17,8 +17,11 @@ class NearbyWorkersResponse(Schema):
     username: str
     specialization: str
     rating: float
+    experience: int
+    is_verified: bool
     distance_km: float
     address: str
+    score: float
 
 class PartsShopSchema(Schema):
     name: str

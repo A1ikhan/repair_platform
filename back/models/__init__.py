@@ -5,6 +5,13 @@ from .notifications_models import Notification
 
 from .repair_requests_models import RepairRequest, RepairRequestFile
 from .response_models import Response
-from .userlist_model import UserList,ListItem
+from .userlist_model import UserList, ListItem
 from .chat_model import ChatMessage
-__all__ = ['RepairRequest', 'RepairRequestFile', 'Response','CustomerProfile','WorkerProfile','UserActivity','UserList','ListItem']
+from .pricing_models import DeviceBasePrice, RepairKeyword
+
+__all__ = [
+    'RepairRequest', 'RepairRequestFile', 'Response',
+    'CustomerProfile', 'WorkerProfile', 'UserActivity',
+    'UserList', 'ListItem',
+    'DeviceBasePrice', 'RepairKeyword',
+]

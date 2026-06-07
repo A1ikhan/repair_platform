@@ -210,13 +210,20 @@ class LocationService:
             }
 
     @staticmethod
-    def find_nearby_workers(customer_lat: float, customer_lon: float, max_distance_km: int = 10) -> List[Dict]:
+    def find_nearby_workers(
+        customer_lat: float,
+        customer_lon: float,
+        max_distance_km: int = 10,
+        device_type: Optional[str] = None,
+    ) -> List[Dict]:
         """
-        Найти работников поблизости от клиента
+        Найти работников поблизости от клиента.
+        Результат отсортирован по составному скор-баллу (рейтинг, расстояние,
+        опыт, специализация, доступность, верификация).
         """
         from back.models.geolocation_models import UserLocation
+        from back.services.worker_scoring_service import WorkerScoringService
 
-        # Получаем всех работников с указанными локациями
         workers_with_locations = UserLocation.objects.filter(
             user__worker_profile__isnull=False,
             latitude__isnull=False,
@@ -230,7 +237,6 @@ class LocationService:
         if not destinations:
             return []
 
-        # Рассчитываем расстояния
         distance_matrix = dgis.calculate_distance_matrix(origins, destinations)
 
         nearby_workers = []
@@ -244,13 +250,14 @@ class LocationService:
                     'username': worker.username,
                     'specialization': worker.worker_profile.specialization,
                     'rating': worker.worker_profile.rating,
+                    'experience': worker.worker_profile.experience,
+                    'is_verified': worker.worker_profile.is_verified,
                     'distance_km': distance,
-                    'address': worker_location.address
+                    'address': worker_location.address,
+                    'score': 0.0,
                 })
 
-        # Сортируем по расстоянию
-        nearby_workers.sort(key=lambda x: x['distance_km'])
-        return nearby_workers
+        return WorkerScoringService.score_workers(nearby_workers, max_distance_km, device_type)
 
     @staticmethod
     def search_nearby_parts_shops(lat: float, lon: float, part_name: str = "запчасти") -> List[Dict]:

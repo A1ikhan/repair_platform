@@ -1,14 +1,15 @@
+import io
 import random
 from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand
-from django.db import transaction
 from django.utils import timezone
 
 from back.models.users_models import CustomerProfile, WorkerProfile, UserActivity
-from back.models.repair_requests_models import RepairRequest
+from back.models.repair_requests_models import RepairRequest, ProblemPhoto, RepairRequestFile
 from back.models.response_models import Response
 from back.models.reviews_models import Review
 from back.models.chat_model import ChatMessage
@@ -236,6 +237,36 @@ FOLDER_COLORS = ["#EF4444", "#10B981", "#3B82F6", "#F59E0B", "#8B5CF6"]
 
 CITIES = ["Алматы", "Астана", "Шымкент"]
 
+# (background_dark, background_light, accent)
+DEVICE_PALETTE = {
+    'fridge':        ((30, 90, 150),  (60, 140, 210), (200, 225, 255)),
+    'washer':        ((20, 110, 80),  (40, 170, 120), (200, 245, 225)),
+    'dryer':         ((100, 50, 150), (150, 90, 200), (230, 210, 255)),
+    'oven':          ((160, 60, 10),  (220, 100, 30), (255, 220, 180)),
+    'microwave':     ((140, 30, 30),  (200, 60, 60),  (255, 200, 200)),
+    'dishwasher':    ((15, 120, 130), (30, 180, 190), (190, 240, 245)),
+    'tv':            ((25, 40, 70),   (50, 80, 130),  (180, 200, 240)),
+    'ac':            ((30, 100, 170), (60, 150, 220), (200, 230, 255)),
+    'water_heater':  ((170, 90, 10),  (220, 140, 30), (255, 230, 180)),
+    'vacuum':        ((80, 80, 90),   (130, 130, 145),(220, 220, 230)),
+    'coffee_machine':((70, 40, 15),   (120, 75, 35),  (220, 190, 150)),
+    'other':         ((60, 70, 80),   (100, 115, 130),(210, 215, 225)),
+}
+
+DEVICE_LABELS = {
+    'fridge': 'ХОЛОДИЛЬНИК', 'washer': 'СТИРАЛЬНАЯ\nМАШИНА',
+    'dryer': 'СУШИЛЬНАЯ\nМАШИНА', 'oven': 'ДУХОВОЙ\nШКАФ',
+    'microwave': 'МИКРОВОЛНОВКА', 'dishwasher': 'ПОСУДОМОЙКА',
+    'tv': 'ТЕЛЕВИЗОР', 'ac': 'КОНДИЦИОНЕР',
+    'water_heater': 'ВОДОНАГРЕ-\nВАТЕЛЬ', 'vacuum': 'ПЫЛЕСОС',
+    'coffee_machine': 'КОФЕМАШИНА', 'other': 'ТЕХНИКА',
+}
+
+DAMAGE_LABELS = [
+    "НЕ РАБОТАЕТ", "НЕИСПРАВНОСТЬ", "ТРЕБУЕТ\nРЕМОНТА",
+    "ПОЛОМКА", "НЕИСПРАВЕН", "ОШИБКА",
+]
+
 
 class Command(BaseCommand):
     help = "Seed the database with realistic sample data"
@@ -275,6 +306,8 @@ class Command(BaseCommand):
         ChatMessage.objects.all().delete()
         Review.objects.all().delete()
         Response.objects.all().delete()
+        RepairRequestFile.objects.all().delete()
+        ProblemPhoto.objects.all().delete()
         RepairRequest.objects.all().delete()
         UserActivity.objects.all().delete()
         try:
@@ -378,6 +411,7 @@ class Command(BaseCommand):
                     predicted_price=d["predicted_price"],
                     price_confidence=d["price_confidence"],
                 )
+                self._seed_photos(rr)
                 requests.append(rr)
                 UserActivity.objects.create(
                     user=customer,
@@ -551,6 +585,123 @@ class Command(BaseCommand):
                     notes=f"Интересный заказ. Цена хорошая.",
                     personal_rating=random.randint(3, 5),
                 )
+
+    # ── photo helpers ──────────────────────────────────────────────────────────
+
+    def _generate_photo_bytes(self, device_type: str, shot_index: int) -> bytes:
+        """Generate a Pillow image that looks like a repair photo and return JPEG bytes."""
+        from PIL import Image, ImageDraw
+
+        W, H = 800, 600
+        palette = DEVICE_PALETTE.get(device_type, DEVICE_PALETTE['other'])
+        dark, light, accent = palette
+
+        img = Image.new('RGB', (W, H))
+        draw = ImageDraw.Draw(img)
+
+        # gradient background
+        for y in range(H):
+            t = y / H
+            r = int(dark[0] + (light[0] - dark[0]) * t)
+            g = int(dark[1] + (light[1] - dark[1]) * t)
+            b = int(dark[2] + (light[2] - dark[2]) * t)
+            draw.line([(0, y), (W, y)], fill=(r, g, b))
+
+        # subtle grid lines (simulate surface texture)
+        grid_color = tuple(max(0, c - 20) for c in light)
+        for x in range(0, W, 40):
+            draw.line([(x, 0), (x, H)], fill=grid_color, width=1)
+        for y in range(0, H, 40):
+            draw.line([(0, y), (W, y)], fill=grid_color, width=1)
+
+        # central "device body" rectangle
+        margin_x, margin_y = 120, 80
+        draw.rectangle(
+            [(margin_x, margin_y), (W - margin_x, H - margin_y)],
+            fill=tuple(min(255, c + 30) for c in light),
+            outline=accent,
+            width=3,
+        )
+
+        # per-shot visual variation: scratches / damage marks
+        rng = random.Random(device_type + str(shot_index))
+        for _ in range(rng.randint(3, 8)):
+            x1 = rng.randint(margin_x + 20, W - margin_x - 20)
+            y1 = rng.randint(margin_y + 20, H - margin_y - 20)
+            x2 = x1 + rng.randint(-60, 60)
+            y2 = y1 + rng.randint(-30, 30)
+            draw.line([(x1, y1), (x2, y2)], fill=(30, 30, 30), width=rng.randint(1, 3))
+
+        # device label (top-center)
+        device_label = DEVICE_LABELS.get(device_type, 'ТЕХНИКА')
+        self._draw_centered_text(draw, device_label, W // 2, margin_y + 40,
+                                  fill=accent, font_size=28)
+
+        # damage label (bottom-center, red badge)
+        damage_text = DAMAGE_LABELS[shot_index % len(DAMAGE_LABELS)]
+        badge_y = H - margin_y - 50
+        draw.rectangle(
+            [(W // 2 - 120, badge_y - 18), (W // 2 + 120, badge_y + 18)],
+            fill=(180, 30, 30),
+        )
+        self._draw_centered_text(draw, damage_text.replace('\n', ' '),
+                                  W // 2, badge_y, fill=(255, 255, 255), font_size=18)
+
+        # shot number badge (top-right corner)
+        draw.ellipse([(W - 60, 15), (W - 15, 60)], fill=(0, 0, 0, 180))
+        self._draw_centered_text(draw, str(shot_index + 1),
+                                  W - 37, 37, fill=(255, 255, 255), font_size=18)
+
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=85)
+        return buf.getvalue()
+
+    @staticmethod
+    def _draw_centered_text(draw, text, cx, cy, fill, font_size):
+        """Draw text centered at (cx, cy). Falls back to default font gracefully."""
+        try:
+            from PIL import ImageFont
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except (IOError, OSError):
+            try:
+                from PIL import ImageFont
+                font = ImageFont.load_default()
+            except Exception:
+                font = None
+
+        if font:
+            bbox = draw.textbbox((0, 0), text, font=font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+        else:
+            tw, th = len(text) * 6, 11
+
+        draw.text((cx - tw // 2, cy - th // 2), text, fill=fill, font=font)
+
+    def _seed_photos(self, rr: RepairRequest):
+        """Generate 1–3 photos per repair request and attach as ProblemPhoto + RepairRequestFile."""
+        num_photos = random.randint(1, 3)
+        for i in range(num_photos):
+            jpeg_bytes = self._generate_photo_bytes(rr.device_type, i)
+            filename = f"{rr.device_type}_req{rr.id}_shot{i + 1}.jpg"
+            content = ContentFile(jpeg_bytes, name=filename)
+
+            # ProblemPhoto (M2M on RepairRequest)
+            photo = ProblemPhoto.objects.create(
+                uploaded_by=rr.created_by,
+                description=f"Фото поломки #{i + 1}",
+            )
+            photo.image.save(filename, content, save=True)
+            rr.problem_photos.add(photo)
+
+            # RepairRequestFile (FK, with thumbnail via ImageKit)
+            rrf = RepairRequestFile(
+                repair_request=rr,
+                uploaded_by=rr.created_by,
+                description=f"Фото проблемы #{i + 1}",
+                is_public=True,
+            )
+            rrf.file.save(filename, ContentFile(jpeg_bytes, name=filename), save=True)
 
     def _seed_userlists(self, customers, requests):
         self.stdout.write("Seeding user lists...")

@@ -28,6 +28,9 @@ class PricePredictionSchema(Schema):
     predicted_price: Optional[float] = None
     confidence: float = 0.0
     price_range: Optional[dict] = None
+    keywords_matched: List[str] = []
+    repair_type: str = "unknown"
+    photo_analysis: Optional[dict] = None
     message: str = ""
 
 

@@ -4,7 +4,9 @@ services:
   web:
     build: .
     command: >
-      sh -c "python manage.py migrate && gunicorn --bind 0.0.0.0:8080 core.wsgi:application"
+      sh -c "python manage.py migrate &&
+             mkdir -p /tmp/prometheus_multiproc &&
+             daphne -b 0.0.0.0 -p 8080 core.asgi:application"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -15,6 +17,13 @@ services:
     environment:
       - DB_HOST=db
       - REDIS_URL=redis://redis:6379
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/health/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -45,7 +54,41 @@ services:
       timeout: 5s
       retries: 5
 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3030:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   static_volume:
   redis_data:
+  prometheus_data:
+  grafana_data:
